@@ -12,17 +12,14 @@ export default function App() {
   const [scenes, setScenes] = useState<string[]>([]);
   const [lastKeyPressed, setLastKeyPressed] = useState<string | null>(null);
 
-  // Audio & Transitions
   const [audioLevel, setAudioLevel] = useState(72);
   const [selectedTransition, setSelectedTransition] = useState('CUT');
 
-  // Lower Thirds / Titrage
   const [speakerName, setSpeakerName] = useState('MC Dany');
   const [speakerTitle, setSpeakerTitle] = useState('Artiste & Producteur');
   const [socialHandle, setSocialHandle] = useState('@DSKILUSHANG');
   const [isLowerThirdActive, setIsLowerThirdActive] = useState(false);
 
-  // Connexion OBS
   const connectOBS = async () => {
     try {
       await obs.connect(`ws://${serverIP}`, password);
@@ -38,7 +35,7 @@ export default function App() {
       });
     } catch (error) {
       console.error('Erreur connexion OBS :', error);
-      alert('Connexion échouée. Vérifie l IP et le mot de passe.');
+      alert('Connexion echouee. Verifie IP et mot de passe.');
     }
   };
 
@@ -48,7 +45,6 @@ export default function App() {
     }
   };
 
-  // Clavier Bluetooth (HID)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) return;
@@ -83,7 +79,7 @@ export default function App() {
           sceneItemEnabled: newState
         });
       } catch (err) {
-        console.log('Mode démo / Source OBS non configurée');
+        console.log('Mode demo');
       }
     }
   };
@@ -91,7 +87,6 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 p-2 font-mono select-none overflow-hidden">
       
-      {/* 1. BARRE SUPERIEURE & STATUS */}
       <div className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 shadow-md mb-2">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
@@ -101,7 +96,7 @@ export default function App() {
           
           {isConnected ? (
             <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-              <Wifi className="w-3 h-3 mr-1" /> ON-AIR (OBS CONNECTÉ)
+              <Wifi className="w-3 h-3 mr-1" /> ON-AIR
             </span>
           ) : (
             <span className="flex items-center text-[10px] font-bold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800">
@@ -111,7 +106,7 @@ export default function App() {
 
           {lastKeyPressed && (
             <span className="hidden sm:flex items-center text-[10px] text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800">
-              <Keyboard className="w-3 h-3 mr-1" /> BT KEY: {lastKeyPressed}
+              <Keyboard className="w-3 h-3 mr-1" /> KEY: {lastKeyPressed}
             </span>
           )}
         </div>
@@ -123,18 +118,18 @@ export default function App() {
               value={serverIP} 
               onChange={(e) => setServerIP(e.target.value)}
               placeholder="IP:Port"
-              className="bg-slate-950 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-200 w-36 focus:outline-none focus:border-blue-500"
+              className="bg-slate-950 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-200 w-36"
             />
             <input 
               type="password" 
               value={password} 
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Pass"
-              className="bg-slate-950 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-200 w-24 focus:outline-none focus:border-blue-500"
+              className="bg-slate-950 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-200 w-24"
             />
             <button 
               onClick={connectOBS}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] px-3 py-0.5 rounded uppercase tracking-wider transition-colors"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] px-3 py-0.5 rounded uppercase tracking-wider"
             >
               CONNECTER
             </button>
@@ -142,17 +137,12 @@ export default function App() {
         )}
       </div>
 
-      {/* 2. CONSOLE PRINCIPALE DE REGIE */}
       <div className="grid grid-cols-12 gap-2 flex-1 overflow-hidden">
         
-        {/* GRILLE 8 CANAUX (GAUCHE) */}
         <div className="col-span-8 bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex flex-col justify-between shadow-inner">
           <div className="flex justify-between items-center mb-2 px-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-              <Monitor className="w-3 h-3 mr-1" /> BANC DE COMMUTATION PROGRAMME (PGM)
-            </span>
-            <span className="text-[9px] bg-slate-950 text-slate-400 px-2 py-0.5 rounded border border-slate-800">
-              8 CANAUX DISPONIBLES
+              <Monitor className="w-3 h-3 mr-1" /> BANC PGM (8 CANAUX)
             </span>
           </div>
 
@@ -174,7 +164,7 @@ export default function App() {
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isPGM ? 'bg-red-950 text-red-200' : 'bg-slate-950 text-slate-400'}`}>
                         CH {index + 1}
                       </span>
-                      <span className="text-[9px] text-slate-400 font-sans">KEY: {index + 1}</span>
+                      <span className="text-[9px] text-slate-400 font-sans">K:{index + 1}</span>
                     </div>
 
                     <div className="my-2 text-left">
@@ -183,7 +173,7 @@ export default function App() {
 
                     <div className="flex justify-between items-center w-full text-[9px] uppercase font-bold tracking-wider">
                       <span className={`w-2 h-2 rounded-full ${isPGM ? 'bg-red-300 animate-ping' : 'bg-slate-700'}`} />
-                      <span>{isPGM ? '● ON-AIR (PGM)' : 'PRÊT'}</span>
+                      <span>{isPGM ? 'ON-AIR' : 'PRET'}</span>
                     </div>
                   </button>
                 );
@@ -191,19 +181,17 @@ export default function App() {
             ) : (
               <div className="col-span-4 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-lg p-6 bg-slate-950/40">
                 <Monitor className="w-8 h-8 mb-2 opacity-40" />
-                <span className="text-xs">Connecte-toi à OBS pour charger les 8 canaux vidéo.</span>
+                <span className="text-xs">Connecte-toi à OBS pour charger les scènes.</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* PANNEAUX DROIT : TRANSITIONS, TITRAGE & AUDIO */}
         <div className="col-span-4 flex flex-col space-y-2 overflow-y-auto">
           
-          {/* TRANSITIONS */}
           <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center mb-1.5">
-              <Sliders className="w-3 h-3 mr-1" /> TRANSITIONS STUDIO
+              <Sliders className="w-3 h-3 mr-1" /> TRANSITIONS
             </span>
             <div className="grid grid-cols-3 gap-1">
               {['CUT', 'FADE', 'STINGER'].map((t) => (
@@ -222,7 +210,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* TITRAGE & LOWER THIRDS */}
           <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex-1 flex flex-col justify-between">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center mb-1.5">
               <Type className="w-3 h-3 mr-1" /> HABILLAGE & SYNCHRO
@@ -234,14 +221,14 @@ export default function App() {
                 value={speakerName}
                 onChange={(e) => setSpeakerName(e.target.value)}
                 placeholder="Nom Intervenant"
-                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px]"
               />
               <input 
                 type="text" 
                 value={speakerTitle}
                 onChange={(e) => setSpeakerTitle(e.target.value)}
                 placeholder="Fonction / Titre"
-                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px]"
               />
               <div className="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
                 <Share2 className="w-3 h-3 mr-1 text-slate-500" />
@@ -268,7 +255,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* VUMETRE AUDIO */}
           <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
             <div className="flex justify-between items-center text-[10px] mb-1">
               <span className="font-bold text-slate-400 uppercase tracking-widest flex items-center">
@@ -279,4 +265,15 @@ export default function App() {
             
             <div className="w-full bg-slate-950 h-3 rounded overflow-hidden p-0.5 border border-slate-800 flex items-center">
               <div 
-                className="h-full bg-gradient-to-r from-emerald-500 via-yellow-500 to
+                className="h-full bg-gradient-to-r from-emerald-500 via-yellow-500 to-rose-500 rounded-sm transition-all duration-300"
+                style={{ width: `${audioLevel}%` }}
+              />
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
