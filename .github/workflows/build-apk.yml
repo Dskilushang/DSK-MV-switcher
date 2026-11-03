@@ -25,8 +25,9 @@ jobs:
 
     - name: 🤖 Initialiser Capacitor Android
       run: |
-        npx cap init DSK-R8-Switcher com.dskilushang.obsswitcher --web-dir dist --yes
+        npx cap init DSK-R8-Switcher com.dskilushang.obsswitcher --web-dir dist
         npx cap add android
+
 
     - name: 📱 Générer le projet Android
       run: npx cap sync android
