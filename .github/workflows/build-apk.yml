@@ -1,0 +1,51 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Récupérer le code du dépôt
+      uses: actions/checkout@v3
+
+    - name: ⚙️ Configurer Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: 📦 Installer les dépendances
+      run: npm install
+
+    - name: 🛠️ Compiler l'application Web (Vite)
+      run: npm run build
+
+    - name: 🤖 Initialiser Capacitor Android
+      run: |
+        npx cap init DSK-R8-Switcher com.dskilushang.obsswitcher --web-dir dist --yes
+        npx cap add android
+
+    - name: 📱 Générer le projet Android
+      run: npx cap sync android
+
+    - name: ☕ Configurer l'environnement Java (JDK)
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: 🏗️ Compiler l'APK Android (Debug)
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug
+
+    - name: 📤 Sauvegarder l'APK généré
+      uses: actions/upload-artifact@v3
+      with:
+        name: dsk-r8-apk-debug
+        path: android/app/build/outputs/apk/debug/app-debug.apk
+        
