@@ -3,5 +3,9 @@
 @tailwind utilities;
 
 body {
-  touch-action: manipulation;
+  margin: 0;
+  background-color: #0f172a;
+  color: #ffffff;
+  font-family: system-ui, -apple-system, sans-serif;
+  user-select: none;
 }
