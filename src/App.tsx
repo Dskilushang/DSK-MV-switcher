@@ -1,278 +1,174 @@
-import React, { useState, useEffect } from 'react';
-import OBSWebSocket from 'obs-websocket-js';
-import { Wifi, WifiOff, Volume2, Sliders, Type, Share2, Play, Monitor, Keyboard, Radio } from 'lucide-react';
-
-const obs = new OBSWebSocket();
+import { useEffect, useState } from 'react';
+import { StatusBar } from './components/StatusBar';
+import { CameraGrid } from './components/CameraGrid';
+import { TransitionControls } from './components/TransitionControls';
+import {
+  connectObs,
+  registerCallbacks,
+  setProgramScene,
+  getSceneList,
+  type ObsStatus,
+} from './services/obsService';
+import { Settings } from 'lucide-react';
 
 export default function App() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [serverIP, setServerIP] = useState('192.168.1.50:4455');
-  const [password, setPassword] = useState('');
-  const [currentScene, setCurrentScene] = useState('');
+  const [status, setStatus] = useState<ObsStatus>('disconnected');
+  const [programChannel, setProgramChannel] = useState(-1);
+  const [previewChannel, setPreviewChannel] = useState(-1);
+  const [programScene, setProgramScene] = useState('');
   const [scenes, setScenes] = useState<string[]>([]);
-  const [lastKeyPressed, setLastKeyPressed] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(true);
 
-  const [audioLevel, setAudioLevel] = useState(72);
-  const [selectedTransition, setSelectedTransition] = useState('CUT');
-
-  const [speakerName, setSpeakerName] = useState('MC Dany');
-  const [speakerTitle, setSpeakerTitle] = useState('Artiste & Producteur');
-  const [socialHandle, setSocialHandle] = useState('@DSKILUSHANG');
-  const [isLowerThirdActive, setIsLowerThirdActive] = useState(false);
-
-  const connectOBS = async () => {
-    try {
-      await obs.connect(`ws://${serverIP}`, password);
-      setIsConnected(true);
-
-      const response = await obs.call('GetSceneList');
-      const loadedScenes = response.scenes.map((s: any) => s.sceneName);
-      setScenes(loadedScenes);
-      setCurrentScene(response.currentProgramSceneName);
-
-      obs.on('CurrentProgramSceneChanged', (data) => {
-        setCurrentScene(data.sceneName);
-      });
-    } catch (error) {
-      console.error('Erreur connexion OBS :', error);
-      alert('Connexion echouee. Verifie IP et mot de passe.');
-    }
-  };
-
-  const switchSceneByIndex = (index: number) => {
-    if (scenes[index]) {
-      obs.call('SetCurrentProgramScene', { sceneName: scenes[index] }).catch(console.error);
-    }
-  };
+  const [host, setHost] = useState('192.168.1.50');
+  const [port, setPort] = useState('4455');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) return;
-      const key = event.key;
-      setLastKeyPressed(key);
-      const keyNumber = parseInt(key, 10);
-      if (!isNaN(keyNumber) && keyNumber >= 1 && keyNumber <= 8) {
-        switchSceneByIndex(keyNumber - 1);
+    registerCallbacks(
+      (st, msg) => {
+        setStatus(st);
+        if (msg) console.log('OBS:', msg);
+      },
+      (sceneName) => {
+        setProgramScene(sceneName);
+        const match = sceneName.match(/Camera\s*(\d+)/i);
+        if (match) {
+          setProgramChannel(parseInt(match[1], 10));
+        }
       }
-    };
+    );
+  }, []);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [scenes]);
-
-  const toggleLowerThird = async () => {
-    const newState = !isLowerThirdActive;
-    setIsLowerThirdActive(newState);
-    if (isConnected) {
-      try {
-        await obs.call('SetInputSettings', {
-          inputName: 'LowerThird_Text',
-          inputSettings: { text: `${speakerName}\n${speakerTitle}` }
-        });
-        await obs.call('SetInputSettings', {
-          inputName: 'Social_Text',
-          inputSettings: { text: socialHandle }
-        });
-        await obs.call('SetSceneItemEnabled', {
-          sceneName: currentScene,
-          sceneItemId: 1,
-          sceneItemEnabled: newState
-        });
-      } catch (err) {
-        console.log('Mode demo');
-      }
+  const handleConnect = async () => {
+    const ok = await connectObs({
+      host,
+      port: parseInt(port, 10),
+      password,
+    });
+    if (ok) {
+      const list = await getSceneList();
+      setScenes(list);
+      setShowSettings(false);
     }
   };
 
-  return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 p-2 font-mono select-none overflow-hidden">
-      
-      <div className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 shadow-md mb-2">
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
-            <Radio className={`w-3.5 h-3.5 ${isConnected ? 'text-red-500 animate-pulse' : 'text-slate-600'}`} />
-            <span className="text-xs font-bold tracking-wider text-slate-200">DSK-R8 SWITCHER</span>
-          </div>
-          
-          {isConnected ? (
-            <span className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-              <Wifi className="w-3 h-3 mr-1" /> ON-AIR
-            </span>
-          ) : (
-            <span className="flex items-center text-[10px] font-bold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800">
-              <WifiOff className="w-3 h-3 mr-1" /> HORS LIGNE
-            </span>
-          )}
+  const handleSelect = (channel: number) => {
+    setPreviewChannel(channel);
+  };
 
-          {lastKeyPressed && (
-            <span className="hidden sm:flex items-center text-[10px] text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800">
-              <Keyboard className="w-3 h-3 mr-1" /> KEY: {lastKeyPressed}
-            </span>
-          )}
-        </div>
+  const handleCut = async (channel?: number) => {
+    const target = channel ?? previewChannel;
+    if (target === -1) return;
 
-        {!isConnected && (
-          <div className="flex space-x-1.5 text-xs">
-            <input 
-              type="text" 
-              value={serverIP} 
-              onChange={(e) => setServerIP(e.target.value)}
-              placeholder="IP:Port"
-              className="bg-slate-950 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-200 w-36"
-            />
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Pass"
-              className="bg-slate-950 text-[11px] px-2 py-0.5 rounded border border-slate-700 text-slate-200 w-24"
-            />
-            <button 
-              onClick={connectOBS}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] px-3 py-0.5 rounded uppercase tracking-wider"
-            >
-              CONNECTER
-            </button>
-          </div>
-        )}
-      </div>
+    const sceneName = `Camera ${target}`;
+    try {
+      await setProgramScene(sceneName);
+      setProgramChannel(target);
+      setPreviewChannel(-1);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-      <div className="grid grid-cols-12 gap-2 flex-1 overflow-hidden">
-        
-        <div className="col-span-8 bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex flex-col justify-between shadow-inner">
-          <div className="flex justify-between items-center mb-2 px-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-              <Monitor className="w-3 h-3 mr-1" /> BANC PGM (8 CANAUX)
-            </span>
-          </div>
+  const handleAuto = async () => {
+    await handleCut();
+  };
 
-          <div className="grid grid-cols-4 gap-2 flex-1">
-            {scenes.length > 0 ? (
-              scenes.slice(0, 8).map((scene, index) => {
-                const isPGM = currentScene === scene;
-                return (
-                  <button
-                    key={scene}
-                    onClick={() => switchSceneByIndex(index)}
-                    className={`relative flex flex-col justify-between p-3 rounded border-2 transition-all active:scale-95 ${
-                      isPGM 
-                        ? 'bg-gradient-to-b from-red-600 to-red-800 border-red-400 text-white shadow-lg shadow-red-900/60' 
-                        : 'bg-gradient-to-b from-slate-800 to-slate-900 border-slate-700 hover:border-slate-500 text-slate-300'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center w-full">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isPGM ? 'bg-red-950 text-red-200' : 'bg-slate-950 text-slate-400'}`}>
-                        CH {index + 1}
-                      </span>
-                      <span className="text-[9px] text-slate-400 font-sans">K:{index + 1}</span>
-                    </div>
+  if (showSettings) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white p-6 flex flex-col justify-center">
+        <div className="max-w-md mx-auto w-full">
+          <h1 className="text-2xl font-bold mb-2 text-center">
+            DSK R8 — OBS Switcher
+          </h1>
+          <p className="text-slate-400 text-sm text-center mb-8">
+            Connexion au serveur OBS WebSocket
+          </p>
 
-                    <div className="my-2 text-left">
-                      <span className="text-xs font-bold truncate block">{scene}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center w-full text-[9px] uppercase font-bold tracking-wider">
-                      <span className={`w-2 h-2 rounded-full ${isPGM ? 'bg-red-300 animate-ping' : 'bg-slate-700'}`} />
-                      <span>{isPGM ? 'ON-AIR' : 'PRET'}</span>
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="col-span-4 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-lg p-6 bg-slate-950/40">
-                <Monitor className="w-8 h-8 mb-2 opacity-40" />
-                <span className="text-xs">Connecte-toi à OBS pour charger les scènes.</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="col-span-4 flex flex-col space-y-2 overflow-y-auto">
-          
-          <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center mb-1.5">
-              <Sliders className="w-3 h-3 mr-1" /> TRANSITIONS
-            </span>
-            <div className="grid grid-cols-3 gap-1">
-              {['CUT', 'FADE', 'STINGER'].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTransition(t)}
-                  className={`text-[10px] py-1.5 rounded font-bold border transition-colors ${
-                    selectedTransition === t 
-                      ? 'bg-blue-600 border-blue-400 text-white shadow' 
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase text-slate-500 mb-1">
+                Adresse IP du PC
+              </label>
+              <input
+                type="text"
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
+              />
             </div>
-          </div>
-
-          <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex-1 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center mb-1.5">
-              <Type className="w-3 h-3 mr-1" /> HABILLAGE & SYNCHRO
-            </span>
-
-            <div className="space-y-1.5 text-xs">
-              <input 
-                type="text" 
-                value={speakerName}
-                onChange={(e) => setSpeakerName(e.target.value)}
-                placeholder="Nom Intervenant"
-                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px]"
+            <div>
+              <label className="block text-xs uppercase text-slate-500 mb-1">
+                Port
+              </label>
+              <input
+                type="text"
+                value={port}
+                onChange={(e) => setPort(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
               />
-              <input 
-                type="text" 
-                value={speakerTitle}
-                onChange={(e) => setSpeakerTitle(e.target.value)}
-                placeholder="Fonction / Titre"
-                className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 text-[11px]"
+            </div>
+            <div>
+              <label className="block text-xs uppercase text-slate-500 mb-1">
+                Mot de passe OBS
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Laisser vide si non configuré"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500"
               />
-              <div className="flex items-center bg-slate-950 border border-slate-800 rounded px-2 py-1">
-                <Share2 className="w-3 h-3 mr-1 text-slate-500" />
-                <input 
-                  type="text" 
-                  value={socialHandle}
-                  onChange={(e) => setSocialHandle(e.target.value)}
-                  placeholder="@pseudo"
-                  className="bg-transparent w-full text-slate-200 text-[11px] focus:outline-none"
-                />
-              </div>
             </div>
 
             <button
-              onClick={toggleLowerThird}
-              className={`w-full py-2 mt-2 rounded font-bold text-[10px] uppercase tracking-wider flex items-center justify-center transition-all ${
-                isLowerThirdActive 
-                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-950' 
-                  : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
-              }`}
+              onClick={handleConnect}
+              disabled={status === 'connecting'}
+              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 py-4 rounded-lg font-bold transition-all active:scale-95 mt-4"
             >
-              <Play className="w-3 h-3 mr-1 fill-current" />
-              {isLowerThirdActive ? 'MASQUER LE TITRE' : 'ENVOYER SUR PGM'}
+              {status === 'connecting' ? 'Connexion...' : 'Se connecter'}
             </button>
-          </div>
 
-          <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-            <div className="flex justify-between items-center text-[10px] mb-1">
-              <span className="font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                <Volume2 className="w-3 h-3 mr-1" /> AUDIO MASTER
-              </span>
-              <span className="text-emerald-400 font-mono font-bold">{audioLevel} dB</span>
-            </div>
-            
-            <div className="w-full bg-slate-950 h-3 rounded overflow-hidden p-0.5 border border-slate-800 flex items-center">
-              <div 
-                className="h-full bg-gradient-to-r from-emerald-500 via-yellow-500 to-rose-500 rounded-sm transition-all duration-300"
-                style={{ width: `${audioLevel}%` }}
-              />
-            </div>
+            {status === 'error' && (
+              <p className="text-red-400 text-sm text-center">
+                Impossible de se connecter. Vérifiez l'IP, le port et le mot de passe.
+              </p>
+            )}
           </div>
-
         </div>
+      </div>
+    );
+  }
 
+  return (
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+      <StatusBar status={status} programScene={programScene} />
+
+      <div className="flex-1 flex flex-col justify-center gap-4 py-4">
+        <CameraGrid
+          programChannel={programChannel}
+          previewChannel={previewChannel}
+          onSelect={handleSelect}
+          onCut={handleCut}
+        />
+
+        <TransitionControls
+          onCut={() => handleCut()}
+          onAuto={handleAuto}
+          disabled={previewChannel === -1}
+        />
+      </div>
+
+      <div className="px-4 py-2 bg-slate-900 border-t border-slate-800 flex justify-between items-center">
+        <button
+          onClick={() => setShowSettings(true)}
+          className="text-slate-400 hover:text-white flex items-center gap-1 text-xs"
+        >
+          <Settings size={14} /> Paramètres
+        </button>
+        <span className="text-xs text-slate-600">
+          {scenes.length} scènes détectées
+        </span>
       </div>
     </div>
   );
