@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { StatusBar } from './components/statutbar';
 import { CameraGrid } from './components/cameragrid';
 import { TransitionControls } from './components/transitioncontroles';
+  import {
   connectObs,
   registerCallbacks,
   setProgramScene,
   getSceneList,
-  type ObsStatus,
+  ObsStatus,
 } from './services/obsService';
 import { Settings } from 'lucide-react';
 
