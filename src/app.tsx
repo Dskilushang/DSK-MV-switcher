@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Radio, Video, Zap } from 'lucide-react';
+import { Settings, Radio, MonitorPlay, Zap } from 'lucide-react';
 
 export default function App() {
   // États pour le mélangeur
@@ -27,7 +27,7 @@ export default function App() {
       <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
         <div className="flex items-center gap-2">
           <div className="bg-red-600 p-1.5 rounded-md">
-            <Video size={18} className="text-white" />
+            <MonitorPlay size={18} className="text-white" />
           </div>
           <div>
             <h1 className="text-lg font-black tracking-widest uppercase leading-none">DSK - MV</h1>
