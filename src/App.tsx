@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Settings, Radio, MonitorPlay, Zap } from 'lucide-react';
-
+import TBar from './TBar';
 export default function App() {
   // États pour le mélangeur
   const [programChannel, setProgramChannel] = useState(1);
