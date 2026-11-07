@@ -6,7 +6,12 @@ export default function App() {
   const [programChannel, setProgramChannel] = useState(1);
   const [previewChannel, setPreviewChannel] = useState(2);
   const [isLive, setIsLive] = useState(false);
-
+// Fonction pour inverser les caméras (transition manuelle via la T-Bar)
+const handleTransition = () => {
+  const temp = programCam;
+  setProgramCam(previewCam);
+  setPreviewCam(temp);
+};
   // Fonction pour le bouton CUT
   const handleCut = () => {
     const temp = programChannel;
