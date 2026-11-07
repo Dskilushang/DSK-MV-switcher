@@ -1,2 +1,2 @@
-# dsk-r8-obs-switcher
+# dsk-mv-switcher
 Mélangeur vidéo 
