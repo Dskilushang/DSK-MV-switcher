@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { StatusBar } from './components/StatusBar';
-import { CameraGrid } from './components/CameraGrid';
-import { TransitionControls } from './components/TransitionControls';
-import {
+import { StatusBar } from './components/statutbar';
+import { CameraGrid } from './components/cameragrid';
+import { TransitionControls } from './components/transitioncontroles';
   connectObs,
   registerCallbacks,
   setProgramScene,
