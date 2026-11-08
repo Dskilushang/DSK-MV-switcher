@@ -85,6 +85,19 @@ export default function App() {
               <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
                 CAM {channel}
               </div>
+              {/* Barre de niveau audio (VU-mètre) */}
+<div className="absolute bottom-0 left-0 right-0 h-1.5 flex gap-0.5 px-1 opacity-80">
+  {[1, 2, 3, 4, 5].map((bar) => (
+    <div 
+      key={bar}
+      className={`flex-1 rounded-sm transition-all duration-300 ${
+        bar <= (audioLevels[channel - 1] / 20) 
+          ? (bar >= 4 ? 'bg-red-500' : bar >= 3 ? 'bg-yellow-500' : 'bg-green-500') 
+          : 'bg-slate-700'
+      }`}
+    />
+  ))}
+</div>
               
               {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
               
