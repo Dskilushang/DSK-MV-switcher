@@ -70,20 +70,27 @@ const [isDskActive, setIsDskActive] = useState(false);
 
           return (
             <div 
-              key={channel}
-              onClick={() => setPreviewChannel(channel)}
-              className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
-            >
-              <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-              <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
-                CAM {channel}
-              </div>
-              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
-              {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
-            </div>
-          );
-        })}
-      </main>
+  key={channel}
+  onClick={() => setPreviewChannel(channel)}
+  className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
+>
+  <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+  
+  <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
+    CAM {channel}
+  </div>
+  
+  {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
+  
+  {/* Bloc DSK (Logo) ajouté */}
+  {isProgram && isDskActive && (
+    <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-black shadow-lg">
+      MON LOGO
+    </div>
+  )}
+
+  {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
+</div>
 
       {/* --- CONTRÔLES DU BAS --- */}
       <footer className="bg-slate-900 border-t border-slate-800 pb-4">
