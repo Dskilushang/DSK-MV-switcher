@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { Settings, Radio, MonitorPlay, Zap } from 'lucide-react';
 import TBar from './TBar';
+
 export default function App() {
   // États pour le mélangeur
   const [programChannel, setProgramChannel] = useState(1);
   const [previewChannel, setPreviewChannel] = useState(2);
   const [isLive, setIsLive] = useState(false);
-// Fonction pour inverser les caméras (transition manuelle via la T-Bar)
-const handleTransition = () => {
-  const temp = programCam;
-  setProgramCam(previewCam);
-  setPreviewCam(temp);
-};
+
+  // Fonction pour inverser les caméras (transition manuelle via la T-Bar)
+  const handleTransition = () => {
+    const temp = programChannel;
+    setProgramChannel(previewChannel);
+    setPreviewChannel(temp);
+  };
+
   // Fonction pour le bouton CUT
   const handleCut = () => {
     const temp = programChannel;
@@ -21,7 +24,6 @@ const handleTransition = () => {
 
   // Fonction pour le bouton AUTO (transition fluide - simulée pour l'instant)
   const handleAuto = () => {
-    // Ici, plus tard, on mettra une vraie transition (fondu)
     handleCut();
   };
 
@@ -60,7 +62,6 @@ const handleTransition = () => {
           const isProgram = programChannel === channel;
           const isPreview = previewChannel === channel;
           
-          // Couleurs pour les contours
           const borderColor = isProgram 
             ? 'border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
             : isPreview 
@@ -73,15 +74,10 @@ const handleTransition = () => {
               onClick={() => setPreviewChannel(channel)}
               className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
             >
-              {/* Image de fond factice pour la caméra (sera remplacée par la vraie vidéo) */}
               <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-              
-              {/* Numéro de la caméra */}
               <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
                 CAM {channel}
               </div>
-              
-              {/* Badge Program ou Preview */}
               {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
               {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
             </div>
@@ -92,13 +88,22 @@ const handleTransition = () => {
       {/* --- CONTRÔLES DU BAS --- */}
       <footer className="bg-slate-900 border-t border-slate-800 pb-4">
         
-        {/* Barre de transition (T-Bar visuelle) */}
-        <div className="px-6 py-3 flex items-center gap-4">
-          <span className="text-xs font-bold text-red-500">PROG</span>
-          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
-            <div className="w-1/2 h-full bg-gradient-to-r from-red-500 to-green-500" />
+        {/* Zone avec la T-Bar */}
+        <div className="px-4 py-2 flex items-center justify-between gap-4">
+          <div className="flex flex-col text-center">
+            <span className="text-xs font-bold text-red-500 mb-1">PROG</span>
+            <span className="text-xs font-bold text-slate-500">CAM {programChannel}</span>
           </div>
-          <span className="text-xs font-bold text-green-500">PREV</span>
+          
+          {/* LA VRAIE T-BAR ICI */}
+          <div className="flex-1 h-32 flex justify-center items-center">
+            <TBar onTransition={handleTransition} />
+          </div>
+
+          <div className="flex flex-col text-center">
+            <span className="text-xs font-bold text-green-500 mb-1">PREV</span>
+            <span className="text-xs font-bold text-slate-500">CAM {previewChannel}</span>
+          </div>
         </div>
 
         {/* Boutons 1 à 8 */}
@@ -140,4 +145,4 @@ const handleTransition = () => {
       </footer>
     </div>
   );
-          }
+      }
