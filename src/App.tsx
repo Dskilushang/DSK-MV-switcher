@@ -154,9 +154,9 @@ export default function App() {
             className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-black text-xl tracking-wider border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2"
           >
             <Zap size={20} /> AUTO
-          </button>
-        </div>
+                  </div>
       </footer>
+      </div>
     </div>
   );
-      }
+    }
