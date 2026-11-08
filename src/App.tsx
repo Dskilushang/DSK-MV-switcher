@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Settings, Radio, MonitorPlay, Zap } from 'lucide-react';
 import TBar from './TBar';
 
@@ -7,7 +7,13 @@ export default function App() {
   const [programChannel, setProgramChannel] = useState(1);
   const [previewChannel, setPreviewChannel] = useState(2);
   const [isLive, setIsLive] = useState(false);
-const [isDskActive, setIsDskActive] = useState(false);
+  const [isDskActive, setIsDskActive] = useState(false);
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Simulation des niveaux audio pour chaque caméra (valeur entre 0 et 100)
+  const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
+
   // Fonction pour inverser les caméras (transition manuelle via la T-Bar)
   const handleTransition = () => {
     const temp = programChannel;
@@ -26,6 +32,7 @@ const [isDskActive, setIsDskActive] = useState(false);
   const handleAuto = () => {
     handleCut();
   };
+
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
