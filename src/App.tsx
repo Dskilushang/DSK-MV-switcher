@@ -33,7 +33,6 @@ export default function App() {
     handleCut();
   };
 
-
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       
@@ -77,27 +76,31 @@ export default function App() {
 
           return (
             <div 
-  key={channel}
-  onClick={() => setPreviewChannel(channel)}
-  className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
->
-  <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-  
-  <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
-    CAM {channel}
-  </div>
-  
-  {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
-  
-  {/* Bloc DSK (Logo) ajouté */}
-  {isProgram && isDskActive && (
-    <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-black shadow-lg">
-      MON LOGO
-    </div>
-  )}
+              key={channel}
+              onClick={() => setPreviewChannel(channel)}
+              className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
+            >
+              <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+              
+              <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
+                CAM {channel}
+              </div>
+              
+              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
+              
+              {isProgram && isDskActive && (
+                <img 
+                  src={customLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Direct8_logo.svg/200px-Direct8_logo.svg.png"} 
+                  alt="Logo" 
+                  className="absolute top-2 right-2 w-16 h-auto drop-shadow-md"
+                />
+              )}
 
-  {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
-</div>
+              {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
+            </div>
+          );
+        })}
+      </main>
 
       {/* --- CONTRÔLES DU BAS --- */}
       <footer className="bg-slate-900 border-t border-slate-800 pb-4">
@@ -109,7 +112,6 @@ export default function App() {
             <span className="text-xs font-bold text-slate-500">CAM {programChannel}</span>
           </div>
           
-          {/* LA VRAIE T-BAR ICI */}
           <div className="flex-1 h-32 flex justify-center items-center">
             <TBar onTransition={handleTransition} />
           </div>
@@ -141,6 +143,44 @@ export default function App() {
           })}
         </div>
 
+        {/* Input caché pour choisir le logo */}
+        <input 
+          type="file" 
+          accept="image/*" 
+          ref={fileInputRef} 
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setCustomLogo(URL.createObjectURL(file));
+            }
+          }}
+          className="hidden" 
+        />
+
+        {/* Bouton pour changer le logo */}
+        <div className="flex gap-4 px-4 mb-2">
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-md font-bold text-sm border-b-2 border-slate-950 transition-all"
+          >
+            Choisir un Logo
+          </button>
+        </div>
+
+        {/* Bouton DSK (Logo) */}
+        <div className="flex gap-4 px-4 mb-4">
+          <button 
+            onClick={() => setIsDskActive(!isDskActive)}
+            className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+              isDskActive 
+                ? 'bg-purple-600 border-purple-800 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' 
+                : 'bg-slate-800 border-slate-950 text-slate-400'
+            }`}
+          >
+            {isDskActive ? 'DSK : ON' : 'DSK : OFF'}
+          </button>
+        </div>
+
         {/* Boutons CUT et AUTO */}
         <div className="flex gap-4 px-4">
           <button 
@@ -154,9 +194,9 @@ export default function App() {
             className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-black text-xl tracking-wider border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2"
           >
             <Zap size={20} /> AUTO
-                  </div>
+          </button>
+        </div>
       </footer>
-      </div>
     </div>
   );
-    }
+        }
