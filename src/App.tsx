@@ -85,7 +85,7 @@ useEffect(() => {
       </header>
 
       {/* --- MULTIVIEW (8 CAMÉRAS) --- */}
-      <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
+            <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => {
           const isProgram = programChannel === channel;
           const isPreview = previewChannel === channel;
@@ -107,22 +107,20 @@ useEffect(() => {
               <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
                 CAM {channel}
               </div>
-              {/* Barre de niveau audio (VU-mètre) */}
-<div className="absolute bottom-0 left-0 right-0 h-1.5 flex gap-0.5 px-1 opacity-80">
-  {[1, 2, 3, 4, 5].map((bar) => (
-    <div 
-      key={bar}
-      className={`flex-1 rounded-sm transition-all duration-300 ${
-        bar <= (audioLevels[channel - 1] / 20) 
-          ? (bar >= 4 ? 'bg-red-500' : bar >= 3 ? 'bg-yellow-500' : 'bg-green-500') 
-          : 'bg-slate-700'
-      }`}
-    />
-  ))}
-</div>
               
+              {/* Badge PROGRAM */}
               {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
               
+              {/* Indicateur Chroma Key */}
+              {isProgram && isChromaActive && (
+                <div className="absolute inset-0 border-4 border-emerald-500 rounded-lg pointer-events-none animate-pulse">
+                  <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-black shadow-lg">
+                    FOND VERT
+                  </div>
+                </div>
+              )}
+
+              {/* Logo DSK */}
               {isProgram && isDskActive && (
                 <img 
                   src={customLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Direct8_logo.svg/200px-Direct8_logo.svg.png"} 
@@ -131,7 +129,22 @@ useEffect(() => {
                 />
               )}
 
+              {/* Badge PREVIEW */}
               {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
+
+              {/* Barre de niveau audio (VU-mètre) */}
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 flex gap-0.5 px-1 opacity-80">
+                {[1, 2, 3, 4, 5].map((bar) => (
+                  <div 
+                    key={bar}
+                    className={`flex-1 rounded-sm transition-all duration-300 ${
+                      bar <= (audioLevels[channel - 1] / 20) 
+                        ? (bar >= 4 ? 'bg-red-500' : bar >= 3 ? 'bg-yellow-500' : 'bg-green-500') 
+                        : 'bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           );
         })}
@@ -201,19 +214,21 @@ useEffect(() => {
             Choisir un Logo
           </button>
         </div>
-{/* Bouton Chroma Key (Fond Vert) */}
-<div className="flex gap-4 px-4 mb-2">
-  <button 
-    onClick={() => setIsChromaActive(!isChromaActive)}
-    className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-      isChromaActive 
-        ? 'bg-emerald-600 border-emerald-800 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
-        : 'bg-slate-800 border-slate-950 text-slate-400'
-    }`}
-  >
-    {isChromaActive ? 'CHROMA (Fond Vert) : ON' : 'CHROMA (Fond Vert) : OFF'}
-  </button>
-</div>
+
+        {/* Bouton Chroma Key (Fond Vert) */}
+        <div className="flex gap-4 px-4 mb-2">
+          <button 
+            onClick={() => setIsChromaActive(!isChromaActive)}
+            className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+              isChromaActive 
+                ? 'bg-emerald-600 border-emerald-800 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
+                : 'bg-slate-800 border-slate-950 text-slate-400'
+            }`}
+          >
+            {isChromaActive ? 'CHROMA (Fond Vert) : ON' : 'CHROMA (Fond Vert) : OFF'}
+          </button>
+        </div>
+
         {/* Bouton DSK (Logo) */}
         <div className="flex gap-4 px-4 mb-4">
           <button 
@@ -246,4 +261,4 @@ useEffect(() => {
       </footer>
     </div>
   );
-        }
+            }
