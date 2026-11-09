@@ -10,6 +10,8 @@ export default function App() {
   const [isDskActive, setIsDskActive] = useState(false);
   // État pour activer/désactiver le fond vert (Chroma Key)
 const [isChromaActive, setIsChromaActive] = useState(false);
+  // État pour activer/désactiver l'enregistrement
+const [isRecording, setIsRecording] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
