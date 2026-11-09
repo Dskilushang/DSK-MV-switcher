@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Settings, Radio, MonitorPlay, Zap } from 'lucide-react';
 import TBar from './TBar';
 
@@ -13,7 +13,27 @@ export default function App() {
 
   // Simulation des niveaux audio pour chaque caméra (valeur entre 0 et 100)
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
+// Animation automatique des niveaux audio (simulation)
+useEffect(() => {
+  const interval = setInterval(() => {
+    setAudioLevels(prevLevels => 
+      prevLevels.map(level => {
+        // On fait varier le niveau de -15% à +15% de façon aléatoire
+        const change = Math.floor(Math.random() * 30) - 15;
+        let newLevel = level + change;
+        
+        // On garde le niveau entre 5 et 95 (pour éviter les extrêmes)
+        if (newLevel > 95) newLevel = 95;
+        if (newLevel < 5) newLevel = 5;
+        
+        return newLevel;
+      })
+    );
+  }, 500); // Se met à jour toutes les 500 millisecondes (0.5 seconde)
 
+  // Nettoyage quand on quitte l'écran
+  return () => clearInterval(interval);
+}, []);
   // Fonction pour inverser les caméras (transition manuelle via la T-Bar)
   const handleTransition = () => {
     const temp = programChannel;
