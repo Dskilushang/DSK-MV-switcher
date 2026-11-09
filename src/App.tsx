@@ -8,6 +8,8 @@ export default function App() {
   const [previewChannel, setPreviewChannel] = useState(2);
   const [isLive, setIsLive] = useState(false);
   const [isDskActive, setIsDskActive] = useState(false);
+  // État pour activer/désactiver le fond vert (Chroma Key)
+const [isChromaActive, setIsChromaActive] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
