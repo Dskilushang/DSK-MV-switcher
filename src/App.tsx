@@ -201,7 +201,19 @@ useEffect(() => {
             Choisir un Logo
           </button>
         </div>
-
+{/* Bouton Chroma Key (Fond Vert) */}
+<div className="flex gap-4 px-4 mb-2">
+  <button 
+    onClick={() => setIsChromaActive(!isChromaActive)}
+    className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+      isChromaActive 
+        ? 'bg-emerald-600 border-emerald-800 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
+        : 'bg-slate-800 border-slate-950 text-slate-400'
+    }`}
+  >
+    {isChromaActive ? 'CHROMA (Fond Vert) : ON' : 'CHROMA (Fond Vert) : OFF'}
+  </button>
+</div>
         {/* Bouton DSK (Logo) */}
         <div className="flex gap-4 px-4 mb-4">
           <button 
