@@ -85,6 +85,7 @@ export default function App() {
     handleCut();
   };
 
+  return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       
       {/* --- EN-TÊTE --- */}
@@ -98,8 +99,7 @@ export default function App() {
             <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mélangeur Vidéo</p>
           </div>
         </div>
-        // État pour activer/désactiver l'enregistrement
-const [isRecording, setIsRecording] = useState(false);
+        
         <div className="flex items-center gap-3">
           {isLive ? (
             <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
@@ -115,7 +115,7 @@ const [isRecording, setIsRecording] = useState(false);
       </header>
 
       {/* --- MULTIVIEW (8 CAMÉRAS) --- */}
-            <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
+      <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => {
           const isProgram = programChannel === channel;
           const isPreview = previewChannel === channel;
@@ -133,36 +133,36 @@ const [isRecording, setIsRecording] = useState(false);
               className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
             >
               {/* Affichage de la vraie caméra pour la CAM 1 */}
-{channel === 1 ? (
-  <video 
-    ref={localVideoRef} 
-    autoPlay 
-    playsInline 
-    muted 
-    className="absolute inset-0 w-full h-full object-cover opacity-80"
-  />
-) : (
-  <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-)}
+              {channel === 1 ? (
+                <video 
+                  ref={localVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="absolute inset-0 w-full h-full object-cover opacity-80"
+                />
+              ) : (
+                <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+              )}
               
               <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
                 CAM {channel}
               </div>
               
               {/* Badge PROGRAM */}
-              {/* Fenêtre Picture-in-Picture (s'affiche sur la caméra PROGRAM si activé) */}
-{isProgram && isPipActive && (
-  <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-10 flex items-center justify-center">
-    <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-    
-    {/* Numéro de la caméra en Preview */}
-    <span className="relative z-10 text-2xl font-black text-white/50">
-      CAM {previewChannel}
-    </span>
-    
-    <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold z-10">PIP</div>
-  </div>
-)}
+              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
+              
+              {/* Fenêtre Picture-in-Picture */}
+              {isProgram && isPipActive && (
+                <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-10 flex items-center justify-center">
+                  <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+                  <span className="relative z-10 text-2xl font-black text-white/50">
+                    CAM {previewChannel}
+                  </span>
+                  <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold z-10">PIP</div>
+                </div>
+              )}
+
               {/* Indicateur Chroma Key */}
               {isProgram && isChromaActive && (
                 <div className="absolute inset-0 border-4 border-emerald-500 rounded-lg pointer-events-none animate-pulse">
