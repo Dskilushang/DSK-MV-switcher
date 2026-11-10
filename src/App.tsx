@@ -71,7 +71,8 @@ useEffect(() => {
             <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mélangeur Vidéo</p>
           </div>
         </div>
-        
+        // État pour activer/désactiver l'enregistrement
+const [isRecording, setIsRecording] = useState(false);
         <div className="flex items-center gap-3">
           {isLive ? (
             <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
