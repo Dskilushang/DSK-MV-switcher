@@ -235,6 +235,20 @@ const [isRecording, setIsRecording] = useState(false);
         </div>
 
         {/* Bouton DSK (Logo) */}
+        {/* Bouton PIP (Picture-in-Picture) */}
+<div className="flex gap-4 px-4 mb-2">
+  <button 
+    onClick={() => setIsPipActive(!isPipActive)}
+    className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+      isPipActive 
+        ? 'bg-orange-600 border-orange-800 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]' 
+        : 'bg-slate-800 border-slate-950 text-slate-400'
+    }`}
+  >
+    {isPipActive ? 'PIP : ON' : 'PIP : OFF'}
+  </button>
+</div>
+        
         <div className="flex gap-4 px-4 mb-4">
           <button 
             onClick={() => setIsDskActive(!isDskActive)}
