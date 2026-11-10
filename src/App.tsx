@@ -19,7 +19,11 @@ export default function App() {
   // --- GESTION DE LA CAMÉRA LOCALE ---
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-
+  // Liens des caméras distantes (pour les caméras 2 à 8)
+const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
+// État pour ouvrir/fermer la fenêtre de réglages
+const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
   // --- SIMULATION AUDIO ---
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
 
