@@ -20,6 +20,33 @@ const [isRecording, setIsRecording] = useState(false);
   // Simulation des niveaux audio pour chaque caméra (valeur entre 0 et 100)
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
 // Animation automatique des niveaux audio (simulation)
+  // Demande d'accès à la caméra locale (pour la CAM 1)
+useEffect(() => {
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' }, // 'environment' = caméra arrière
+        audio: false 
+      });
+      setCameraStream(stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Impossible d'accéder à la caméra :", err);
+    }
+  };
+
+  startCamera();
+
+  // Nettoyage : on éteint la caméra quand on quitte l'écran
+  return () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+    }
+  };
+}, []); 
+          
 useEffect(() => {
   const interval = setInterval(() => {
     setAudioLevels(prevLevels => 
