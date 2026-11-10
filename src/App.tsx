@@ -222,7 +222,7 @@ const [isRecording, setIsRecording] = useState(false);
         />
 
         {/* Bouton pour changer le logo */}
-        <div className="flex gap-4 px-4 mb-2">
+        <div className="flex gap-4 px-4 mb-4">
           <button 
             onClick={() => fileInputRef.current?.click()}
             className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-md font-bold text-sm border-b-2 border-slate-950 transition-all"
@@ -231,45 +231,39 @@ const [isRecording, setIsRecording] = useState(false);
           </button>
         </div>
 
-        {/* Bouton Chroma Key (Fond Vert) */}
-        <div className="flex gap-4 px-4 mb-2">
+        {/* Boutons d'effets (Chroma, PIP, DSK) sur une seule ligne */}
+        <div className="grid grid-cols-3 gap-2 px-4 mb-4">
           <button 
             onClick={() => setIsChromaActive(!isChromaActive)}
-            className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+            className={`py-2 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
               isChromaActive 
                 ? 'bg-emerald-600 border-emerald-800 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
                 : 'bg-slate-800 border-slate-950 text-slate-400'
             }`}
           >
-            {isChromaActive ? 'CHROMA (Fond Vert) : ON' : 'CHROMA (Fond Vert) : OFF'}
+            {isChromaActive ? 'CHROMA ON' : 'CHROMA OFF'}
           </button>
-        </div>
 
-        {/* Bouton DSK (Logo) */}
-        {/* Bouton PIP (Picture-in-Picture) */}
-<div className="flex gap-4 px-4 mb-2">
-  <button 
-    onClick={() => setIsPipActive(!isPipActive)}
-    className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-      isPipActive 
-        ? 'bg-orange-600 border-orange-800 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]' 
-        : 'bg-slate-800 border-slate-950 text-slate-400'
-    }`}
-  >
-    {isPipActive ? 'PIP : ON' : 'PIP : OFF'}
-  </button>
-</div>
-        
-        <div className="flex gap-4 px-4 mb-4">
+          <button 
+            onClick={() => setIsPipActive(!isPipActive)}
+            className={`py-2 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+              isPipActive 
+                ? 'bg-orange-600 border-orange-800 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]' 
+                : 'bg-slate-800 border-slate-950 text-slate-400'
+            }`}
+          >
+            {isPipActive ? 'PIP ON' : 'PIP OFF'}
+          </button>
+
           <button 
             onClick={() => setIsDskActive(!isDskActive)}
-            className={`flex-1 py-2 rounded-md font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+            className={`py-2 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
               isDskActive 
                 ? 'bg-purple-600 border-purple-800 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' 
                 : 'bg-slate-800 border-slate-950 text-slate-400'
             }`}
           >
-            {isDskActive ? 'DSK : ON' : 'DSK : OFF'}
+            {isDskActive ? 'DSK ON' : 'DSK OFF'}
           </button>
         </div>
 
@@ -291,4 +285,4 @@ const [isRecording, setIsRecording] = useState(false);
       </footer>
     </div>
   );
-            }
+    }
