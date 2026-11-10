@@ -11,6 +11,8 @@ export default function App() {
   // État pour activer/désactiver le fond vert (Chroma Key)
 const [isChromaActive, setIsChromaActive] = useState(false);
   // État pour activer/désactiver l'enregistrement
+  // État pour activer/désactiver le PIP (Picture-in-Picture)
+const [isPipActive, setIsPipActive] = useState(false);
 const [isRecording, setIsRecording] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
