@@ -338,6 +338,49 @@ useEffect(() => {
           </button>
         </div>
      </footer>
+      {/* Fenêtre de réglages des caméras distantes (Wi-Fi) */}
+{isSettingsOpen && (
+  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+    <div className="bg-slate-800 rounded-lg p-4 w-full max-w-sm border border-slate-600 shadow-2xl">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold text-white">Réglages Caméras (Wi-Fi)</h2>
+        <button 
+          onClick={() => setIsSettingsOpen(false)}
+          className="text-slate-400 hover:text-white text-xl font-bold"
+        >
+          ✕
+        </button>
+      </div>
+      
+      <p className="text-xs text-slate-400 mb-4">
+        Entrez l'adresse IP ou le lien du flux vidéo (NDI / RTSP / WebRTC) pour chaque caméra.
+      </p>
+
+      <div className="space-y-3">
+        {[2, 3, 4, 5, 6, 7, 8].map((cam) => (
+          <div key={cam} className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-300 w-12">CAM {cam}</span>
+            <input 
+              type="text" 
+              placeholder="http://192.168.1.x:8080/stream"
+              value={remoteCameras[cam] || ''}
+              onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})}
+              className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
+            />
+          </div>
+        ))}
+      </div>
+
+      <button 
+        onClick={() => setIsSettingsOpen(false)}
+        className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all"
+      >
+        Enregistrer et Fermer
+      </button>
+    </div>
+  </div>
+)}
+    
     </div>
   );
 }
