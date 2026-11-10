@@ -114,12 +114,17 @@ const [isRecording, setIsRecording] = useState(false);
               </div>
               
               {/* Badge PROGRAM */}
-              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
               {/* Fenêtre Picture-in-Picture (s'affiche sur la caméra PROGRAM si activé) */}
 {isProgram && isPipActive && (
-  <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-10">
-    <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-    <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold">PIP</div>
+  <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-10 flex items-center justify-center">
+    <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+    
+    {/* Numéro de la caméra en Preview */}
+    <span className="relative z-10 text-2xl font-black text-white/50">
+      CAM {previewChannel}
+    </span>
+    
+    <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold z-10">PIP</div>
   </div>
 )}
               {/* Indicateur Chroma Key */}
