@@ -40,7 +40,6 @@ useEffect(() => {
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        // Force le téléphone à lire la vidéo immédiatement
         localVideoRef.current.play().catch(e => console.log("Lecture bloquée :", e));
       }
       
