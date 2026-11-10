@@ -3,70 +3,69 @@ import { Settings, Radio, MonitorPlay, Zap } from 'lucide-react';
 import TBar from './TBar';
 
 export default function App() {
-  // États pour le mélangeur
+  // --- ÉTATS DU MÉLANGEUR ---
   const [programChannel, setProgramChannel] = useState(1);
   const [previewChannel, setPreviewChannel] = useState(2);
   const [isLive, setIsLive] = useState(false);
   const [isDskActive, setIsDskActive] = useState(false);
-  // État pour activer/désactiver le fond vert (Chroma Key)
-const [isChromaActive, setIsChromaActive] = useState(false);
-  // État pour activer/désactiver l'enregistrement
-  // État pour activer/désactiver le PIP (Picture-in-Picture)
-const [isPipActive, setIsPipActive] = useState(false);
-const [isRecording, setIsRecording] = useState(false);
+  const [isChromaActive, setIsChromaActive] = useState(false);
+  const [isPipActive, setIsPipActive] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  
+  // --- GESTION DU LOGO ---
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Simulation des niveaux audio pour chaque caméra (valeur entre 0 et 100)
+  // --- GESTION DE LA CAMÉRA LOCALE ---
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+
+  // --- SIMULATION AUDIO ---
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
-// Animation automatique des niveaux audio (simulation)
+
   // Demande d'accès à la caméra locale (pour la CAM 1)
-useEffect(() => {
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, // 'environment' = caméra arrière
-        audio: false 
-      });
-      setCameraStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+  useEffect(() => {
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' },
+          audio: false 
+        });
+        setCameraStream(stream);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("Impossible d'accéder à la caméra :", err);
       }
-    } catch (err) {
-      console.error("Impossible d'accéder à la caméra :", err);
-    }
-  };
+    };
 
-  startCamera();
+    startCamera();
 
-  // Nettoyage : on éteint la caméra quand on quitte l'écran
-  return () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-    }
-  };
-}, []); 
-          
-useEffect(() => {
-  const interval = setInterval(() => {
-    setAudioLevels(prevLevels => 
-      prevLevels.map(level => {
-        // On fait varier le niveau de -15% à +15% de façon aléatoire
-        const change = Math.floor(Math.random() * 30) - 15;
-        let newLevel = level + change;
-        
-        // On garde le niveau entre 5 et 95 (pour éviter les extrêmes)
-        if (newLevel > 95) newLevel = 95;
-        if (newLevel < 5) newLevel = 5;
-        
-        return newLevel;
-      })
-    );
-  }, 500); // Se met à jour toutes les 500 millisecondes (0.5 seconde)
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
-  // Nettoyage quand on quitte l'écran
-  return () => clearInterval(interval);
-}, []);
+  // Animation automatique des niveaux audio
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAudioLevels(prevLevels => 
+        prevLevels.map(level => {
+          const change = Math.floor(Math.random() * 30) - 15;
+          let newLevel = level + change;
+          if (newLevel > 95) newLevel = 95;
+          if (newLevel < 5) newLevel = 5;
+          return newLevel;
+        })
+      );
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Fonction pour inverser les caméras (transition manuelle via la T-Bar)
   const handleTransition = () => {
     const temp = programChannel;
@@ -81,12 +80,11 @@ useEffect(() => {
     setPreviewChannel(temp);
   };
 
-  // Fonction pour le bouton AUTO (transition fluide - simulée pour l'instant)
+  // Fonction pour le bouton AUTO
   const handleAuto = () => {
     handleCut();
   };
 
-  return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       
       {/* --- EN-TÊTE --- */}
