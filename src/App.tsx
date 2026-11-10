@@ -115,7 +115,13 @@ const [isRecording, setIsRecording] = useState(false);
               
               {/* Badge PROGRAM */}
               {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
-              
+              {/* Fenêtre Picture-in-Picture (s'affiche sur la caméra PROGRAM si activé) */}
+{isProgram && isPipActive && (
+  <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-10">
+    <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+    <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold">PIP</div>
+  </div>
+)}
               {/* Indicateur Chroma Key */}
               {isProgram && isChromaActive && (
                 <div className="absolute inset-0 border-4 border-emerald-500 rounded-lg pointer-events-none animate-pulse">
