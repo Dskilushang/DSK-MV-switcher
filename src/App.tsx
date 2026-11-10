@@ -21,6 +21,8 @@ export default function App() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Références pour les vidéos distantes (une par caméra)
+const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
 
   // --- SIMULATION AUDIO ---
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
