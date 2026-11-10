@@ -16,46 +16,36 @@ export default function App() {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- GESTION DE LA CAMÉRA LOCALE ---
+  // --- GESTION DES CAMÉRAS ---
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  // Liens des caméras distantes (pour les caméras 2 à 8)
-const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
-// État pour ouvrir/fermer la fenêtre de réglages
-const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
+  const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   // --- SIMULATION AUDIO ---
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
 
-// Demande d'accès à la caméra locale (pour la CAM 1)
-useEffect(() => {
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' },
-        audio: false 
-      });
-      
-      setCameraStream(stream);
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(e => console.log("Lecture bloquée :", e));
+  // Demande d'accès à la caméra locale (pour la CAM 1)
+  useEffect(() => {
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' },
+          audio: false 
+        });
+        
+        setCameraStream(stream);
+        
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          localVideoRef.current.play().catch(e => console.log("Lecture bloquée :", e));
+        }
+        
+      } catch (err) {
+        console.error("Impossible d'accéder à la caméra :", err);
       }
-      
-    } catch (err) {
-      console.error("Impossible d'accéder à la caméra :", err);
-    }
-  };
+    };
 
-  startCamera();
-
-  return () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-    }
-  };
-}, []);
     startCamera();
 
     return () => {
@@ -100,7 +90,7 @@ useEffect(() => {
   const handleAuto = () => {
     handleCut();
   };
-
+         
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       
