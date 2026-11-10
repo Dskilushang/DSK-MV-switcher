@@ -142,20 +142,16 @@ const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
               key={channel}
               onClick={() => setPreviewChannel(channel)}
               className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
-            >
-              {/* Affichage de la vraie caméra pour la CAM 1 */}
-              {channel === 1 ? (
-                <video 
-                  ref={localVideoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  className="absolute inset-0 w-full h-full object-cover opacity-80"
-                />
-              ) : (
-                <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-              )}
-              
+            >{/* Affichage de la vraie caméra pour la CAM 1 */}
+{channel === 1 ? (
+  <video 
+    ref={localVideoRef} 
+    autoPlay 
+    ...
+  />
+) : (
+  <div className="absolute inset-0 opacity-20..." />
+)}
               
               <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
                 CAM {channel}
