@@ -318,7 +318,7 @@ export default function App() {
             <Zap size={20} /> AUTO
           </button>
         </div>
-      </footer>
+     </footer>
     </div>
   );
-    }
+}
