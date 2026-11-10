@@ -125,9 +125,12 @@ useEffect(() => {
           ) : (
             <span className="text-xs font-bold text-slate-500">OFFLINE</span>
           )}
-          <button className="p-2 text-slate-400 hover:text-white transition-colors">
-            <Settings size={20} />
-          </button>
+          <button 
+  onClick={() => setIsSettingsOpen(true)}
+  className="p-2 text-slate-400 hover:text-white transition-colors"
+>
+  <Settings size={20} />
+</button>
         </div>
       </header>
 
