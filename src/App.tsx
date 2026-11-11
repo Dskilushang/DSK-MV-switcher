@@ -148,33 +148,46 @@ const toggleRecording = () => {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       
       {/* --- EN-TÊTE --- */}
-      <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="bg-red-600 p-1.5 rounded-md">
-            <MonitorPlay size={18} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-black tracking-widest uppercase leading-none">DSK - MV</h1>
-            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mélangeur Vidéo</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {isLive ? (
-            <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
-              <Radio size={14} /> LIVE
-            </span>
-          ) : (
-            <span className="text-xs font-bold text-slate-500">OFFLINE</span>
-          )}
-          <button 
-  onClick={() => setIsSettingsOpen(true)}
-  className="p-2 text-slate-400 hover:text-white transition-colors"
->
-  <Settings size={20} />
-</button>
-        </div>
-      </header>
+<header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+  <div className="flex items-center gap-2">
+    <div className="bg-red-600 p-1.5 rounded-md">
+      <MonitorPlay size={18} className="text-white" />
+    </div>
+    <div>
+      <h1 className="text-lg font-black tracking-widest uppercase leading-none">DSK - MV</h1>
+      <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mélangeur Vidéo</p>
+    </div>
+  </div>
+  
+  <div className="flex items-center gap-3">
+    {/* Bouton Enregistrement (REC) */}
+    <button 
+      onClick={toggleRecording}
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
+        isRecording 
+          ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
+          : 'bg-slate-800 text-slate-400 border border-slate-700'
+      }`}
+    >
+      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
+      {isRecording ? 'REC' : 'REC OFF'}
+    </button>
+
+    {isLive ? (
+      <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
+        <Radio size={14} /> LIVE
+      </span>
+    ) : (
+      <span className="text-xs font-bold text-slate-500">OFFLINE</span>
+    )}
+    <button 
+      onClick={() => setIsSettingsOpen(true)}
+      className="p-2 text-slate-400 hover:text-white transition-colors"
+    >
+      <Settings size={20} />
+    </button>
+  </div>
+</header>
 
       {/* --- MULTIVIEW (8 CAMÉRAS) --- */}
       <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
