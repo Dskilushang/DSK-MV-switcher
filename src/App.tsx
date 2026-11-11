@@ -290,6 +290,44 @@ const toggleRecording = () => {
             </div>
           );
         })}
+        // Fonction pour appliquer le détourage du fond vert (Chroma Key)
+const applyChromaKey = (videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => {
+  const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return;
+
+  const drawFrame = () => {
+    if (videoElement.paused || videoElement.ended) return;
+
+    // On dessine la vidéo sur le canvas
+    canvasElement.width = videoElement.videoWidth;
+    canvasElement.height = videoElement.videoHeight;
+    ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+    // On récupère les pixels de l'image
+    const frame = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+    const length = frame.data.length / 4;
+
+    // On parcourt chaque pixel pour supprimer le vert
+    for (let i = 0; i < length; i++) {
+      const r = frame.data[i * 4 + 0];
+      const g = frame.data[i * 4 + 1];
+      const b = frame.data[i * 4 + 2];
+
+      // Si le pixel est très vert (selon la formule classique de Chroma Key)
+      if (g > 100 && g > r * 1.4 && g > b * 1.4) {
+        frame.data[i * 4 + 3] = 0; // On rend le pixel transparent
+      }
+    }
+    
+    // On remet l'image modifiée sur le canvas
+    ctx.putImageData(frame, 0, 0);
+
+    // On boucle pour l'animation
+    chromaAnimationRef.current = requestAnimationFrame(drawFrame);
+  };
+
+  drawFrame();
+};
       </main>
 
       {/* --- CONTRÔLES DU BAS --- */}
