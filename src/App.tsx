@@ -25,6 +25,9 @@ export default function App() {
 const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
   // Référence pour l'enregistreur vidéo
 const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  // Références pour le traitement du fond vert (Chroma Key)
+const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
+const chromaAnimationRef = useRef<number | null>(null);
 // Stockage des morceaux de vidéo enregistrés
 const recordedChunks = useRef<Blob[]>([]);
 
