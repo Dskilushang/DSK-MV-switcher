@@ -96,6 +96,53 @@ const recordedChunks = useRef<Blob[]>([]);
   const handleAuto = () => {
     handleCut();
   };
+  // Fonction pour démarrer ou arrêter l'enregistrement
+const toggleRecording = () => {
+  if (isRecording) {
+    // --- ARRÊTER L'ENREGISTREMENT ---
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  } else {
+    // --- DÉMARRER L'ENREGISTREMENT ---
+    // On utilise le flux de la caméra locale (CAM 1)
+    if (cameraStream) {
+      try {
+        const recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
+        mediaRecorderRef.current = recorder;
+        recordedChunks.current = [];
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunks.current.push(event.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          // Quand on arrête, on crée un fichier vidéo et on le télécharge
+          const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          document.body.appendChild(a);
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `enregistrement_${new Date().getTime()}.webm`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        };
+
+        recorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Erreur lors du démarrage de l'enregistrement :", err);
+      }
+    } else {
+      alert("La caméra n'est pas prête pour l'enregistrement.");
+    }
+  }
+};
          
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
