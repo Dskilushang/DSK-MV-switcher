@@ -21,20 +21,18 @@ export default function App() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  // Références pour les vidéos distantes (une par caméra)
-const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
-  // Référence pour l'enregistreur vidéo
-const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  // Références pour le traitement du fond vert (Chroma Key)
-const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
-const chromaAnimationRef = useRef<number | null>(null);
-// Stockage des morceaux de vidéo enregistrés
-const recordedChunks = useRef<Blob[]>([]);
+  const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
+
+  // --- GESTION DE L'ENREGISTREMENT ET CHROMA ---
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunks = useRef<Blob[]>([]);
+  const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
+  const chromaAnimationRef = useRef<number | null>(null);
 
   // --- SIMULATION AUDIO ---
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
 
-  // Demande d'accès à la caméra locale (pour la CAM 1)
+  // Demande d'accès à la caméra locale
   useEffect(() => {
     const startCamera = async () => {
       try {
@@ -81,116 +79,155 @@ const recordedChunks = useRef<Blob[]>([]);
     return () => clearInterval(interval);
   }, []);
 
-  // Fonction pour inverser les caméras (transition manuelle via la T-Bar)
+  // --- LOGIQUE DU CHROMA KEY ---
+  const applyChromaKey = (videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => {
+    const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    const drawFrame = () => {
+      if (videoElement.paused || videoElement.ended) return;
+
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
+      ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+      const frame = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+      const length = frame.data.length / 4;
+
+      for (let i = 0; i < length; i++) {
+        const r = frame.data[i * 4 + 0];
+        const g = frame.data[i * 4 + 1];
+        const b = frame.data[i * 4 + 2];
+
+        // Détection du vert (Chroma Key)
+        if (g > 100 && g > r * 1.4 && g > b * 1.4) {
+          frame.data[i * 4 + 3] = 0; // Transparent
+        }
+      }
+      
+      ctx.putImageData(frame, 0, 0);
+      chromaAnimationRef.current = requestAnimationFrame(drawFrame);
+    };
+
+    drawFrame();
+  };
+
+  // Activer/Désactiver le Chroma Key
+  useEffect(() => {
+    if (isChromaActive && localVideoRef.current && chromaCanvasRef.current) {
+      applyChromaKey(localVideoRef.current, chromaCanvasRef.current);
+    } else {
+      if (chromaAnimationRef.current) {
+        cancelAnimationFrame(chromaAnimationRef.current);
+      }
+    }
+  }, [isChromaActive]);
+
+  // Fonctions de transition
   const handleTransition = () => {
     const temp = programChannel;
     setProgramChannel(previewChannel);
     setPreviewChannel(temp);
   };
 
-  // Fonction pour le bouton CUT
   const handleCut = () => {
     const temp = programChannel;
     setProgramChannel(previewChannel);
     setPreviewChannel(temp);
   };
 
-  // Fonction pour le bouton AUTO
   const handleAuto = () => {
     handleCut();
   };
+
   // Fonction pour démarrer ou arrêter l'enregistrement
-const toggleRecording = () => {
-  if (isRecording) {
-    // --- ARRÊTER L'ENREGISTREMENT ---
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-  } else {
-    // --- DÉMARRER L'ENREGISTREMENT ---
-    // On utilise le flux de la caméra locale (CAM 1)
-    if (cameraStream) {
-      try {
-        const recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
-        mediaRecorderRef.current = recorder;
-        recordedChunks.current = [];
-
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            recordedChunks.current.push(event.data);
-          }
-        };
-
-        recorder.onstop = () => {
-          // Quand on arrête, on crée un fichier vidéo et on le télécharge
-          const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          document.body.appendChild(a);
-          a.style.display = 'none';
-          a.href = url;
-          a.download = `enregistrement_${new Date().getTime()}.webm`;
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        };
-
-        recorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error("Erreur lors du démarrage de l'enregistrement :", err);
+  const toggleRecording = () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
       }
+      setIsRecording(false);
     } else {
-      alert("La caméra n'est pas prête pour l'enregistrement.");
+      if (cameraStream) {
+        try {
+          const recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
+          mediaRecorderRef.current = recorder;
+          recordedChunks.current = [];
+
+          recorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              recordedChunks.current.push(event.data);
+            }
+          };
+
+          recorder.onstop = () => {
+            const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `enregistrement_${new Date().getTime()}.webm`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          };
+
+          recorder.start();
+          setIsRecording(true);
+        } catch (err) {
+          console.error("Erreur d'enregistrement :", err);
+        }
+      } else {
+        alert("La caméra n'est pas prête.");
+      }
     }
-  }
-};
-         
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       
       {/* --- EN-TÊTE --- */}
-<header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
-  <div className="flex items-center gap-2">
-    <div className="bg-red-600 p-1.5 rounded-md">
-      <MonitorPlay size={18} className="text-white" />
-    </div>
-    <div>
-      <h1 className="text-lg font-black tracking-widest uppercase leading-none">DSK - MV</h1>
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mélangeur Vidéo</p>
-    </div>
-  </div>
-  
-  <div className="flex items-center gap-3">
-    {/* Bouton Enregistrement (REC) */}
-    <button 
-      onClick={toggleRecording}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
-        isRecording 
-          ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
-          : 'bg-slate-800 text-slate-400 border border-slate-700'
-      }`}
-    >
-      <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
-      {isRecording ? 'REC' : 'REC OFF'}
-    </button>
+      <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <div className="bg-red-600 p-1.5 rounded-md">
+            <MonitorPlay size={18} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-black tracking-widest uppercase leading-none">DSK - MV</h1>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mélangeur Vidéo</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {/* Bouton REC */}
+          <button 
+            onClick={toggleRecording}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
+              isRecording 
+                ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
+                : 'bg-slate-800 text-slate-400 border border-slate-700'
+            }`}
+          >
+            <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
+            {isRecording ? 'REC' : 'REC OFF'}
+          </button>
 
-    {isLive ? (
-      <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
-        <Radio size={14} /> LIVE
-      </span>
-    ) : (
-      <span className="text-xs font-bold text-slate-500">OFFLINE</span>
-    )}
-    <button 
-      onClick={() => setIsSettingsOpen(true)}
-      className="p-2 text-slate-400 hover:text-white transition-colors"
-    >
-      <Settings size={20} />
-    </button>
-  </div>
-</header>
+          {isLive ? (
+            <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
+              <Radio size={14} /> LIVE
+            </span>
+          ) : (
+            <span className="text-xs font-bold text-slate-500">OFFLINE</span>
+          )}
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
+      </header>
 
       {/* --- MULTIVIEW (8 CAMÉRAS) --- */}
       <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
@@ -209,56 +246,57 @@ const toggleRecording = () => {
               key={channel}
               onClick={() => setPreviewChannel(channel)}
               className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
-            >{/* Affichage de la vraie caméra pour la CAM 1 */}
-             {channel === 1 ? (
-  <video 
-    ref={localVideoRef} 
-    autoPlay 
-    playsInline 
-    muted 
-    className="absolute inset-0 w-full h-full object-cover opacity-80"
-  />
-) : remoteCameras[channel] ? (
-  <video 
-    ref={(el) => { remoteVideoRefs.current[channel] = el; }}
-    src={remoteCameras[channel]} 
-    autoPlay 
-    playsInline 
-    muted 
-    className="absolute inset-0 w-full h-full object-cover opacity-80"
-    onLoadedData={(e) => {
-      const video = e.currentTarget;
-      video.play().catch(err => console.log("Erreur lecture distante :", err));
-    }}
-  />
-) : (
-  <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-)}
+            >
+              {/* Affichage Caméra 1 */}
+              {channel === 1 ? (
+                <div className="absolute inset-0 w-full h-full">
+                  <video 
+                    ref={localVideoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className={`absolute inset-0 w-full h-full object-cover ${isChromaActive ? 'opacity-0' : 'opacity-80'}`}
+                  />
+                  {/* Canvas pour le Chroma Key */}
+                  <canvas 
+                    ref={chromaCanvasRef} 
+                    className={`absolute inset-0 w-full h-full object-cover ${isChromaActive ? 'opacity-100 bg-slate-800' : 'opacity-0 hidden'}`}
+                  />
+                </div>
+              ) : remoteCameras[channel] ? (
+                <video 
+                  ref={(el) => { remoteVideoRefs.current[channel] = el; }}
+                  src={remoteCameras[channel]} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="absolute inset-0 w-full h-full object-cover opacity-80"
+                />
+              ) : (
+                <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+              )}
               
-              <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold">
+              <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold z-10">
                 CAM {channel}
               </div>
               
-              {/* Badge PROGRAM */}
-              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold">PROGRAM</div>}
-              
-              {/* Fenêtre Picture-in-Picture */}
+              {/* Badges */}
+              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold z-10">PROGRAM</div>}
+              {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold z-10">PREVIEW</div>}
+
+              {/* Effet PIP */}
               {isProgram && isPipActive && (
-                <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-10 flex items-center justify-center">
+                <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-20 flex items-center justify-center">
                   <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-                  <span className="relative z-10 text-2xl font-black text-white/50">
-                    CAM {previewChannel}
-                  </span>
+                  <span className="relative z-10 text-2xl font-black text-white/50">CAM {previewChannel}</span>
                   <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold z-10">PIP</div>
                 </div>
               )}
 
-              {/* Indicateur Chroma Key */}
+              {/* Indicateur Chroma */}
               {isProgram && isChromaActive && (
-                <div className="absolute inset-0 border-4 border-emerald-500 rounded-lg pointer-events-none animate-pulse">
-                  <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-black shadow-lg">
-                    FOND VERT
-                  </div>
+                <div className="absolute inset-0 border-4 border-emerald-500 rounded-lg pointer-events-none animate-pulse z-10">
+                  <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-black shadow-lg">FOND VERT ACTIF</div>
                 </div>
               )}
 
@@ -267,15 +305,12 @@ const toggleRecording = () => {
                 <img 
                   src={customLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Direct8_logo.svg/200px-Direct8_logo.svg.png"} 
                   alt="Logo" 
-                  className="absolute top-2 right-2 w-16 h-auto drop-shadow-md"
+                  className="absolute top-2 right-2 w-16 h-auto drop-shadow-md z-20"
                 />
               )}
 
-              {/* Badge PREVIEW */}
-              {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold">PREVIEW</div>}
-
-              {/* Barre de niveau audio (VU-mètre) */}
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 flex gap-0.5 px-1 opacity-80">
+              {/* VU-mètre */}
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 flex gap-0.5 px-1 opacity-80 z-10">
                 {[1, 2, 3, 4, 5].map((bar) => (
                   <div 
                     key={bar}
@@ -290,60 +325,20 @@ const toggleRecording = () => {
             </div>
           );
         })}
-        // Fonction pour appliquer le détourage du fond vert (Chroma Key)
-const applyChromaKey = (videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => {
-  const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return;
-
-  const drawFrame = () => {
-    if (videoElement.paused || videoElement.ended) return;
-
-    // On dessine la vidéo sur le canvas
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
-    ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-
-    // On récupère les pixels de l'image
-    const frame = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-    const length = frame.data.length / 4;
-
-    // On parcourt chaque pixel pour supprimer le vert
-    for (let i = 0; i < length; i++) {
-      const r = frame.data[i * 4 + 0];
-      const g = frame.data[i * 4 + 1];
-      const b = frame.data[i * 4 + 2];
-
-      // Si le pixel est très vert (selon la formule classique de Chroma Key)
-      if (g > 100 && g > r * 1.4 && g > b * 1.4) {
-        frame.data[i * 4 + 3] = 0; // On rend le pixel transparent
-      }
-    }
-    
-    // On remet l'image modifiée sur le canvas
-    ctx.putImageData(frame, 0, 0);
-
-    // On boucle pour l'animation
-    chromaAnimationRef.current = requestAnimationFrame(drawFrame);
-  };
-
-  drawFrame();
-};
       </main>
 
       {/* --- CONTRÔLES DU BAS --- */}
       <footer className="bg-slate-900 border-t border-slate-800 pb-4">
         
-        {/* Zone avec la T-Bar */}
+        {/* T-Bar */}
         <div className="px-4 py-2 flex items-center justify-between gap-4">
           <div className="flex flex-col text-center">
             <span className="text-xs font-bold text-red-500 mb-1">PROG</span>
             <span className="text-xs font-bold text-slate-500">CAM {programChannel}</span>
           </div>
-          
           <div className="flex-1 h-32 flex justify-center items-center">
             <TBar onTransition={handleTransition} />
           </div>
-
           <div className="flex flex-col text-center">
             <span className="text-xs font-bold text-green-500 mb-1">PREV</span>
             <span className="text-xs font-bold text-slate-500">CAM {previewChannel}</span>
@@ -371,21 +366,17 @@ const applyChromaKey = (videoElement: HTMLVideoElement, canvasElement: HTMLCanva
           })}
         </div>
 
-        {/* Input caché pour choisir le logo */}
+        {/* Choix Logo */}
         <input 
           type="file" 
           accept="image/*" 
           ref={fileInputRef} 
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) {
-              setCustomLogo(URL.createObjectURL(file));
-            }
+            if (file) setCustomLogo(URL.createObjectURL(file));
           }}
           className="hidden" 
         />
-
-        {/* Bouton pour changer le logo */}
         <div className="flex gap-4 px-4 mb-4">
           <button 
             onClick={() => fileInputRef.current?.click()}
@@ -395,101 +386,75 @@ const applyChromaKey = (videoElement: HTMLVideoElement, canvasElement: HTMLCanva
           </button>
         </div>
 
-        {/* Boutons d'effets (Chroma, PIP, DSK) sur une seule ligne */}
+        {/* Boutons Effets (Chroma, PIP, DSK) */}
         <div className="grid grid-cols-3 gap-2 px-4 mb-4">
           <button 
             onClick={() => setIsChromaActive(!isChromaActive)}
             className={`py-2 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-              isChromaActive 
-                ? 'bg-emerald-600 border-emerald-800 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' 
-                : 'bg-slate-800 border-slate-950 text-slate-400'
+              isChromaActive ? 'bg-emerald-600 border-emerald-800 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-800 border-slate-950 text-slate-400'
             }`}
           >
             {isChromaActive ? 'CHROMA ON' : 'CHROMA OFF'}
           </button>
-
           <button 
             onClick={() => setIsPipActive(!isPipActive)}
             className={`py-2 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-              isPipActive 
-                ? 'bg-orange-600 border-orange-800 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]' 
-                : 'bg-slate-800 border-slate-950 text-slate-400'
+              isPipActive ? 'bg-orange-600 border-orange-800 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-slate-800 border-slate-950 text-slate-400'
             }`}
           >
             {isPipActive ? 'PIP ON' : 'PIP OFF'}
           </button>
-
           <button 
             onClick={() => setIsDskActive(!isDskActive)}
             className={`py-2 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-              isDskActive 
-                ? 'bg-purple-600 border-purple-800 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' 
-                : 'bg-slate-800 border-slate-950 text-slate-400'
+              isDskActive ? 'bg-purple-600 border-purple-800 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' : 'bg-slate-800 border-slate-950 text-slate-400'
             }`}
           >
             {isDskActive ? 'DSK ON' : 'DSK OFF'}
           </button>
         </div>
 
-        {/* Boutons CUT et AUTO */}
+        {/* CUT et AUTO */}
         <div className="flex gap-4 px-4">
-          <button 
-            onClick={handleCut}
-            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl tracking-wider border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all"
-          >
+          <button onClick={handleCut} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all">
             CUT
           </button>
-          <button 
-            onClick={handleAuto}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-black text-xl tracking-wider border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2"
-          >
+          <button onClick={handleAuto} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-black text-xl border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2">
             <Zap size={20} /> AUTO
           </button>
         </div>
-     </footer>
-      {/* Fenêtre de réglages des caméras distantes (Wi-Fi) */}
-{isSettingsOpen && (
-  <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-    <div className="bg-slate-800 rounded-lg p-4 w-full max-w-sm border border-slate-600 shadow-2xl">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-white">Réglages Caméras (Wi-Fi)</h2>
-        <button 
-          onClick={() => setIsSettingsOpen(false)}
-          className="text-slate-400 hover:text-white text-xl font-bold"
-        >
-          ✕
-        </button>
-      </div>
-      
-      <p className="text-xs text-slate-400 mb-4">
-        Entrez l'adresse IP ou le lien du flux vidéo (NDI / RTSP / WebRTC) pour chaque caméra.
-      </p>
+      </footer>
 
-      <div className="space-y-3">
-        {[2, 3, 4, 5, 6, 7, 8].map((cam) => (
-          <div key={cam} className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-300 w-12">CAM {cam}</span>
-            <input 
-              type="text" 
-              placeholder="http://192.168.1.x:8080/stream"
-              value={remoteCameras[cam] || ''}
-              onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})}
-              className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
-            />
+      {/* --- FENÊTRE DE RÉGLAGES (MODAL) --- */}
+      {isSettingsOpen && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-lg p-4 w-full max-w-sm border border-slate-600 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-white">Réglages Caméras (Wi-Fi)</h2>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">Entrez l'adresse IP ou le lien du flux vidéo.</p>
+            <div className="space-y-3">
+              {[2, 3, 4, 5, 6, 7, 8].map((cam) => (
+                <div key={cam} className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 w-12">CAM {cam}</span>
+                  <input 
+                    type="text" 
+                    placeholder="http://192.168.1.x:8080/stream"
+                    value={remoteCameras[cam] || ''}
+                    onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})}
+                    className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all">
+              Enregistrer et Fermer
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      <button 
-        onClick={() => setIsSettingsOpen(false)}
-        className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all"
-      >
-        Enregistrer et Fermer
-      </button>
-    </div>
-  </div>
-)}
-    
     </div>
   );
-}
+    }
