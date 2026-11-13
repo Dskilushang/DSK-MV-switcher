@@ -21,6 +21,9 @@ export default function App() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Réglages pour le Live (Streaming)
+const [streamKey, setStreamKey] = useState('');
+const [streamUrl, setStreamUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
   const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
 
   // --- GESTION DE L'ENREGISTREMENT ET CHROMA ---
