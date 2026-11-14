@@ -150,91 +150,77 @@ export default function App() {
       handleTransition();
     }
   };
+// --- FONCTION ENREGISTREMENT ---
+const toggleRecording = () => {
+  if (isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  } else {
+    if (programCanvasRef.current) {
+      try {
+        const stream = programCanvasRef.current.captureStream(30);
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorderRef.current = recorder;
+        recordedChunks.current = [];
 
-  // --- FONCTION ENREGISTREMENT ---
-  const toggleRecording = () => {
-    if (isRecording) {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunks.current.push(event.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          document.body.appendChild(a);
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `enregistrement_${new Date().getTime()}.webm`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        };
+
+        recorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Erreur d'enregistrement :", err);
       }
-      // --- MOTEUR DE CAPTURE DU PROGRAM OUT (POUR LE LIVE ET OBS) ---
-useEffect(() => {
-  let animationFrameId: number;
-  const canvas = programCanvasRef.current;
-  
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const drawProgram = () => {
-    // On nettoie le canvas
-    ctx.fillStyle = '#0f172a'; // Fond sombre
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // On dessine la caméra qui est en PROGRAM (Direct)
-    if (programChannel === 1 && localVideoRef.current) {
-      // Si c'est la CAM 1, on dessine la vidéo locale
-      ctx.drawImage(localVideoRef.current, 0, 0, canvas.width, canvas.height);
-    } else if (remoteCameras[programChannel] && remoteVideoRefs.current[programChannel]) {
-      // Si c'est une caméra distante, on dessine sa vidéo
-      ctx.drawImage(remoteVideoRefs.current[programChannel]!, 0, 0, canvas.width, canvas.height);
-    }
-
-    // On ajoute le logo (DSK) si activé
-    if (isDskActive) {
-      // Note : Pour l'instant, on ne peut dessiner que des images chargées. 
-      // Le code pour dessiner l'image du logo viendra plus tard.
-    }
-
-    // On boucle pour rafraîchir à 30 images par seconde
-    animationFrameId = requestAnimationFrame(drawProgram);
-  };
-
-  drawProgram();
-
-  return () => {
-    cancelAnimationFrame(animationFrameId);
-  };
-}, [programChannel, remoteCameras, isDskActive]);
-      setIsRecording(false);
     } else {
-   if (programCanvasRef.current) {
-  try {
-    // On capture le flux vidéo depuis le canvas du mélangeur
-    const stream = programCanvasRef.current.captureStream(30); // 30 images par seconde
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-          mediaRecorderRef.current = recorder;
-          recordedChunks.current = [];
-
-          recorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-              recordedChunks.current.push(event.data);
-            }
-          };
-
-          recorder.onstop = () => {
-            const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            document.body.appendChild(a);
-            a.style.display = 'none';
-            a.href = url;
-            a.download = `enregistrement_${new Date().getTime()}.webm`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          };
-
-          recorder.start();
-          setIsRecording(true);
-        } catch (err) {
-          console.error("Erreur d'enregistrement :", err);
-        }
-      } else {
-        alert("La caméra n'est pas prête.");
-      }
+      alert("La caméra n'est pas prête.");
     }
-  };
+  }
+};
+
+// --- FONCTION POUR LE DIRECT (LIVE) ---
+const toggleLive = () => {
+  if (isLive) {
+    setIsLive(false);
+  } else {
+    if (!streamUrl || !streamKey) {
+      alert("Veuillez configurer l'URL et la clé de flux dans les réglages.");
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    if (programCanvasRef.current) {
+      try {
+        const stream = programCanvasRef.current.captureStream(30);
+        console.log("Connexion au serveur de diffusion...", streamUrl);
+        setIsLive(true);
+        alert("Connexion au direct établie !");
+      } catch (err) {
+        console.error("Erreur lors du démarrage du live :", err);
+        alert("Impossible de démarrer le direct.");
+      }
+    } else {
+      alert("Le mélangeur n'est pas encore prêt.");
+    }
+  }
+};
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
