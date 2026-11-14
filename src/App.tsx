@@ -41,7 +41,6 @@ export default function App() {
   // --- FONCTION D'ACTIVATION DE LA CAMÉRA ET DU MICRO ---
   const startCamera = async () => {
     try {
-      // On ajoute audio: true pour demander le micro
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' },
         audio: true 
@@ -60,7 +59,6 @@ export default function App() {
     }
   };
 
-  // Demande automatique au démarrage
   useEffect(() => {
     startCamera();
 
@@ -71,7 +69,6 @@ export default function App() {
     };
   }, []);
 
-  // Animation automatique des niveaux audio
   useEffect(() => {
     const interval = setInterval(() => {
       setAudioLevels(prevLevels => 
@@ -109,7 +106,7 @@ export default function App() {
         const b = frame.data[i * 4 + 2];
 
         if (g > 100 && g > r * 1.4 && g > b * 1.4) {
-          frame.data[i * 4 + 3] = 0; // Transparent
+          frame.data[i * 4 + 3] = 0;
         }
       }
       
@@ -132,9 +129,7 @@ export default function App() {
 
   // --- FONCTIONS DE TRANSITION ---
   const handleTransition = () => {
-    // Si on est en FREEZE, on ne change pas de caméra
     if (isFrozen) return;
-    
     const temp = programChannel;
     setProgramChannel(previewChannel);
     setPreviewChannel(temp);
@@ -147,14 +142,11 @@ export default function App() {
 
   const handleAuto = () => {
     if (isFrozen) return;
-    // Ici, on simule les différents types de transition
     if (transitionType === 'cut') {
       handleTransition();
     } else if (transitionType === 'fade') {
-      // Simulation d'un fondu (on change juste la caméra pour l'instant)
       handleTransition();
     } else if (transitionType === 'wipe') {
-      // Simulation d'un volet
       handleTransition();
     }
   };
@@ -232,21 +224,24 @@ export default function App() {
             {isRecording ? 'REC' : 'REC OFF'}
           </button>
 
+          {/* Bouton LIVE / OFFLINE */}
           <button 
-  onClick={() => setIsLive(!isLive)}
-  className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
-    isLive 
-      ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
-      : 'bg-slate-800 text-slate-400 border border-slate-700'
-  }`}
->
-  {isLive ? (
-    <>
-      <Radio size={14} /> LIVE
-    </>
-  ) : (
-    'OFFLINE'
-  )}
+            onClick={() => setIsLive(!isLive)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
+              isLive 
+                ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
+                : 'bg-slate-800 text-slate-400 border border-slate-700'
+            }`}
+          >
+            {isLive ? (
+              <>
+                <Radio size={14} /> LIVE
+              </>
+            ) : (
+              'OFFLINE'
+            )}
+          </button>
+
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 text-slate-400 hover:text-white transition-colors"
@@ -459,7 +454,6 @@ export default function App() {
           >
             {isDskActive ? 'DSK ON' : 'DSK OFF'}
           </button>
-          {/* BOUTON FREEZE */}
           <button 
             onClick={() => setIsFrozen(!isFrozen)}
             className={`py-2 rounded-md font-bold text-[10px] border-b-2 transition-all active:border-b-0 active:translate-y-0.5 flex items-center justify-center gap-1 ${
@@ -485,7 +479,7 @@ export default function App() {
           ))}
         </div>
 
-              {/* CUT et AUTO */}
+                {/* CUT et AUTO */}
         <div className="flex gap-4 px-4">
           <button onClick={handleCut} disabled={isFrozen} className={`flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all ${isFrozen ? 'opacity-50' : ''}`}>
             CUT
@@ -563,4 +557,4 @@ export default function App() {
 
     </div>
   );
-          }
+}
