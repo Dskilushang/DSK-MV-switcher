@@ -198,9 +198,11 @@ useEffect(() => {
 }, [programChannel, remoteCameras, isDskActive]);
       setIsRecording(false);
     } else {
-      if (cameraStream) {
-        try {
-          const recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
+   if (programCanvasRef.current) {
+  try {
+    // On capture le flux vidéo depuis le canvas du mélangeur
+    const stream = programCanvasRef.current.captureStream(30); // 30 images par seconde
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
           mediaRecorderRef.current = recorder;
           recordedChunks.current = [];
 
