@@ -173,8 +173,17 @@ const toggleRecording = () => {
   } else {
     if (programCanvasRef.current) {
       try {
-        const stream = programCanvasRef.current.captureStream(30);
-        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        // On récupère la vidéo du mélangeur
+const canvasStream = programCanvasRef.current.captureStream(30);
+// On récupère l'audio du micro (s'il est actif)
+const audioTracks = cameraStream ? cameraStream.getAudioTracks() : [];
+// On fusionne les deux
+const combinedStream = new MediaStream([
+  ...canvasStream.getVideoTracks(),
+  ...audioTracks
+]);
+
+const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
         mediaRecorderRef.current = recorder;
         recordedChunks.current = [];
 
