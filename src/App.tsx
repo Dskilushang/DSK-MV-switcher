@@ -12,6 +12,9 @@ export default function App() {
   const [isPipActive, setIsPipActive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
+  // --- GESTION AUDIO ---
+const [isAudioMuted, setIsAudioMuted] = useState(false);
+const [audioVolume, setAudioVolume] = useState(1);
   const [transitionType, setTransitionType] = useState<'cut' | 'fade' | 'wipe'>('cut');
   
   // --- GESTION DU LOGO ---
@@ -150,6 +153,16 @@ export default function App() {
       handleTransition();
     }
   };
+  // Fonction pour couper/réactiver le micro
+const toggleAudio = () => {
+  if (cameraStream) {
+    const audioTrack = cameraStream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = isAudioMuted; // Si c'était muet, on active. Si c'était actif, on coupe.
+      setIsAudioMuted(!isAudioMuted);
+    }
+  }
+};
 // --- FONCTION ENREGISTREMENT ---
 const toggleRecording = () => {
   if (isRecording) {
@@ -505,7 +518,29 @@ const toggleLive = () => {
             </button>
           ))}
         </div>
-
+{/* --- CONTRÔLES AUDIO --- */}
+<div className="flex items-center gap-3 px-4 mb-3">
+  <button 
+    onClick={toggleAudio}
+    className={`px-3 py-1.5 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+      isAudioMuted 
+        ? 'bg-red-600 border-red-800 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]' 
+        : 'bg-slate-800 border-slate-950 text-slate-300'
+    }`}
+  >
+    {isAudioMuted ? 'MUTE' : 'AUDIO'}
+  </button>
+  
+  <input 
+    type="range" 
+    min="0" 
+    max="1" 
+    step="0.1" 
+    value={audioVolume}
+    onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+  />
+</div>
                 {/* CUT et AUTO */}
         <div className="flex gap-4 px-4">
           <button onClick={handleCut} disabled={isFrozen} className={`flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all ${isFrozen ? 'opacity-50' : ''}`}>
