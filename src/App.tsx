@@ -53,6 +53,16 @@ const gainNodeRef = useRef<GainNode | null>(null);
       });
       
       setCameraStream(stream);
+      // Initialisation du contrôle de volume
+if (!audioContextRef.current) {
+  const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+  audioContextRef.current = new AudioContext();
+  gainNodeRef.current = audioContextRef.current.createGain();
+  
+  const source = audioContextRef.current.createMediaStreamSource(stream);
+  source.connect(gainNodeRef.current);
+  gainNodeRef.current.connect(audioContextRef.current.destination);
+}
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
