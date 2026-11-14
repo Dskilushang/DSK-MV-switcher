@@ -1,17 +1,16 @@
 import React, { useRef } from 'react';
 
 interface TBarProps {
-  onTransition: () => void; // Fonction appelée quand la transition est terminée
+  onTransition: () => void;
   disabled?: boolean;
 }
 
 const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
   const isDragging = useRef(false);
   const startY = useRef(0);
-  const currentPos = useRef(0); // 0 = en bas, 1 = en haut
+  const currentPos = useRef(0); 
   const thumbRef = useRef<HTMLDivElement>(null);
   
-  // Hauteur de la course réduite pour s'adapter parfaitement à l'écran
   const TRACK_HEIGHT = 80; 
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -23,13 +22,9 @@ const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging.current || disabled) return;
-
     const deltaY = startY.current - e.clientY;
     let newPos = currentPos.current + (deltaY / TRACK_HEIGHT);
-
-    // On bloque entre 0 et 1
     newPos = Math.max(0, Math.min(1, newPos));
-    
     if (thumbRef.current) {
       thumbRef.current.style.transform = `translateY(-${newPos * TRACK_HEIGHT}px)`;
     }
@@ -38,25 +33,19 @@ const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
   const handlePointerUp = () => {
     if (!isDragging.current || disabled) return;
     isDragging.current = false;
-
     const transform = thumbRef.current?.style.transform || 'translateY(0px)';
     const match = transform.match(/translateY\(-(\d+(\.\d+)?)px\)/);
-    
     if (match) {
       const pixelsMoved = parseFloat(match[1]);
       const percent = pixelsMoved / TRACK_HEIGHT;
-
       if (percent > 0.5) {
         onTransition();
       }
     }
-
-    // On remet le curseur en bas
     currentPos.current = 0;
     if (thumbRef.current) {
       thumbRef.current.style.transition = 'transform 0.2s ease-out';
       thumbRef.current.style.transform = `translateY(0px)`;
-      
       setTimeout(() => {
         if (thumbRef.current) thumbRef.current.style.transition = 'none';
       }, 200);
@@ -65,7 +54,6 @@ const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
 
   return (
     <div className="flex flex-col items-center justify-end h-full py-1 select-none">
-      {/* Conteneur de la piste (Ajusté pour ne plus déborder) */}
       <div 
         className="relative bg-gray-800 rounded-full w-8 border border-gray-600 flex items-end justify-center"
         style={{ height: `${TRACK_HEIGHT + 30}px` }}
@@ -74,8 +62,6 @@ const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
           className="absolute bottom-4 w-2 bg-gray-900 rounded-full"
           style={{ height: `${TRACK_HEIGHT}px` }}
         />
-        
-        {/* Le curseur (Thumb) */}
         <div
           ref={thumbRef}
           onPointerDown={handlePointerDown}
