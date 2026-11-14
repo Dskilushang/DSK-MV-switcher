@@ -157,6 +157,45 @@ export default function App() {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
+      // --- MOTEUR DE CAPTURE DU PROGRAM OUT (POUR LE LIVE ET OBS) ---
+useEffect(() => {
+  let animationFrameId: number;
+  const canvas = programCanvasRef.current;
+  
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const drawProgram = () => {
+    // On nettoie le canvas
+    ctx.fillStyle = '#0f172a'; // Fond sombre
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // On dessine la caméra qui est en PROGRAM (Direct)
+    if (programChannel === 1 && localVideoRef.current) {
+      // Si c'est la CAM 1, on dessine la vidéo locale
+      ctx.drawImage(localVideoRef.current, 0, 0, canvas.width, canvas.height);
+    } else if (remoteCameras[programChannel] && remoteVideoRefs.current[programChannel]) {
+      // Si c'est une caméra distante, on dessine sa vidéo
+      ctx.drawImage(remoteVideoRefs.current[programChannel]!, 0, 0, canvas.width, canvas.height);
+    }
+
+    // On ajoute le logo (DSK) si activé
+    if (isDskActive) {
+      // Note : Pour l'instant, on ne peut dessiner que des images chargées. 
+      // Le code pour dessiner l'image du logo viendra plus tard.
+    }
+
+    // On boucle pour rafraîchir à 30 images par seconde
+    animationFrameId = requestAnimationFrame(drawProgram);
+  };
+
+  drawProgram();
+
+  return () => {
+    cancelAnimationFrame(animationFrameId);
+  };
+}, [programChannel, remoteCameras, isDskActive]);
       setIsRecording(false);
     } else {
       if (cameraStream) {
