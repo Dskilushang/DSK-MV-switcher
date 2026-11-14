@@ -232,13 +232,21 @@ export default function App() {
             {isRecording ? 'REC' : 'REC OFF'}
           </button>
 
-          {isLive ? (
-            <span className="flex items-center gap-1 text-xs font-bold text-red-500 animate-pulse">
-              <Radio size={14} /> LIVE
-            </span>
-          ) : (
-            <span className="text-xs font-bold text-slate-500">OFFLINE</span>
-          )}
+          <button 
+  onClick={() => setIsLive(!isLive)}
+  className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
+    isLive 
+      ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
+      : 'bg-slate-800 text-slate-400 border border-slate-700'
+  }`}
+>
+  {isLive ? (
+    <>
+      <Radio size={14} /> LIVE
+    </>
+  ) : (
+    'OFFLINE'
+  )}
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 text-slate-400 hover:text-white transition-colors"
