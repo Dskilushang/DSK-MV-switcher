@@ -34,6 +34,9 @@ const [audioVolume, setAudioVolume] = useState(1);
 
   // --- GESTION DE L'ENREGISTREMENT ET CHROMA ---
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  // Référence pour le contrôle du volume audio
+const audioContextRef = useRef<AudioContext | null>(null);
+const gainNodeRef = useRef<GainNode | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
   const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
   const chromaAnimationRef = useRef<number | null>(null);
