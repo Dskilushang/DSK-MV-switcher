@@ -477,6 +477,82 @@ export default function App() {
           ))}
         </div>
 
-        {/* CUT et AUTO */}
+              {/* CUT et AUTO */}
         <div className="flex gap-4 px-4">
-          <button onClick={handleCut} disabled={isFrozen} className={`flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all ${isFrozen ? 
+          <button onClick={handleCut} disabled={isFrozen} className={`flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all ${isFrozen ? 'opacity-50' : ''}`}>
+            CUT
+          </button>
+          <button onClick={handleAuto} disabled={isFrozen} className={`flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-black text-xl border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 ${isFrozen ? 'opacity-50' : ''}`}>
+            <Zap size={20} /> AUTO
+          </button>
+        </div>
+      </footer>
+
+      {/* --- FENÊTRE DE RÉGLAGES (MODAL) --- */}
+      {isSettingsOpen && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-slate-800 rounded-lg p-4 w-full max-w-sm border border-slate-600 shadow-2xl my-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-white">Réglages</h2>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-white text-xl font-bold">✕</button>
+            </div>
+            
+            {/* Section Caméras Wi-Fi */}
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-white mb-2">Caméras Distantes (Wi-Fi)</h3>
+              <p className="text-[10px] text-slate-400 mb-3">Entrez l'adresse IP ou le lien du flux vidéo.</p>
+              <div className="space-y-2">
+                {[2, 3, 4, 5, 6, 7, 8].map((cam) => (
+                  <div key={cam} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-300 w-12">CAM {cam}</span>
+                    <input 
+                      type="text" 
+                      placeholder="http://192.168.1.x:8080/stream"
+                      value={remoteCameras[cam] || ''}
+                      onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})}
+                      className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Section Live (Streaming) */}
+            <div className="mt-6 border-t border-slate-700 pt-4">
+              <h3 className="text-sm font-bold text-white mb-2">Configuration du Direct (Live)</h3>
+              <p className="text-[10px] text-slate-400 mb-3">Entrez votre URL RTMP et votre clé de flux.</p>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 w-12">URL</span>
+                  <input 
+                    type="text" 
+                    placeholder="rtmp://a.rtmp.youtube.com/live2"
+                    value={streamUrl}
+                    onChange={(e) => setStreamUrl(e.target.value)}
+                    className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 w-12">Clé</span>
+                  <input 
+                    type="password" 
+                    placeholder="xxxx-xxxx-xxxx-xxxx"
+                    value={streamKey}
+                    onChange={(e) => setStreamKey(e.target.value)}
+                    className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all">
+              Enregistrer et Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+          }
