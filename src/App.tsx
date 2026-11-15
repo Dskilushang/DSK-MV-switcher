@@ -563,7 +563,37 @@ const toggleLive = () => {
     className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
   />
 </div>
-                {/* CUT et AUTO */}
+                {/* --- CONTRÔLES AUDIO --- */}
+<div className="flex items-center gap-3 px-4 mb-3">
+  <button 
+    onClick={toggleAudio}
+    className={`px-3 py-1.5 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
+      isAudioMuted 
+        ? 'bg-red-600 border-red-800 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]' 
+        : 'bg-slate-800 border-slate-950 text-slate-300'
+    }`}
+  >
+    {isAudioMuted ? 'MUTE' : 'AUDIO'}
+  </button>
+  
+  <input 
+    type="range" 
+    min="0" 
+    max="1" 
+    step="0.1" 
+    value={audioVolume}
+    onChange={(e) => {
+      const val = parseFloat(e.target.value);
+      setAudioVolume(val);
+      if (gainNodeRef.current) {
+        gainNodeRef.current.gain.value = val; // Change le volume réel
+      }
+    }}
+    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+  />
+</div>
+        
+        {/* CUT et AUTO */}
         <div className="flex gap-4 px-4">
           <button onClick={handleCut} disabled={isFrozen} className={`flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all ${isFrozen ? 'opacity-50' : ''}`}>
             CUT
