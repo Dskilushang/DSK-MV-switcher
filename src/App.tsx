@@ -311,6 +311,7 @@ const toggleLive = () => {
           </button>
         </div>
       </header>
+      <main className="flex-1 p-2 grid grid-cols-2 md:grid-cols-4 gap-2 content-start overflow-y-auto">
 
       {/* --- MULTIVIEW (8 CAMÉRAS) --- */}
       <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
