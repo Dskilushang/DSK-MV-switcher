@@ -431,8 +431,7 @@ const toggleLive = () => {
       </main>
 
       {/* --- CONTRÔLES DU BAS --- */}
-      <footer className="bg-slate-900 border-t border-slate-800 pb-4">
-        
+<footer className="bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 pb-4 md:w-[400px] md:overflow-y-auto flex flex-col justify-end">
         {/* T-Bar */}
         <div className="px-4 py-2 flex items-center justify-between gap-4">
           <div className="flex flex-col text-center">
