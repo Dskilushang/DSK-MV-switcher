@@ -258,7 +258,7 @@ const toggleLive = () => {
 };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col md:flex-row font-sans select-none overflow-hidden">
       
       {/* --- EN-TÊTE --- */}
       <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
