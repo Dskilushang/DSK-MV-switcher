@@ -40,6 +40,9 @@ const gainNodeRef = useRef<GainNode | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
   const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
   const chromaAnimationRef = useRef<number | null>(null);
+  // Références pour le Program Out et le Direct
+const programCanvasRef = useRef<HTMLCanvasElement>(null);
+const programPreviewVideoRef = useRef<HTMLVideoElement>(null);
 
   // --- SIMULATION AUDIO ---
   const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
