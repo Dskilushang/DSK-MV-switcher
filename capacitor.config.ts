@@ -1,9 +1,13 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.dskilushang.r8studio',
-  appName: 'DSK-R8 Studio',
+  appId: 'com.dskmv.app',
+  appName: 'DSK-MV-switcher',
   webDir: 'dist',
-  server: { androidScheme: 'http', cleartext: true },
+  orientation: 'landscape', // Force l'écran à l'horizontale
+  server: {
+    androidScheme: 'https'
+  }
 };
+
 export default config;
