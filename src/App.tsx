@@ -147,35 +147,62 @@ if (!audioContextRef.current) {
   const handleTransition = () => {
     if (isFrozen) return;
     const temp = programChannel;
-    setProgramChannel(previewChannel);
-    setPreviewChannel(temp);
-  };
-
-  const handleCut = () => {
-    if (isFrozen) return;
-    handleTransition();
-  };
-
-  const handleAuto = () => {
-    if (isFrozen) return;
-    if (transitionType === 'cut') {
-      handleTransition();
-    } else if (transitionType === 'fade') {
-      handleTransition();
-    } else if (transitionType === 'wipe') {
-      handleTransition();
-    }
-  };
-  // Fonction pour couper/réactiver le micro
-const toggleAudio = () => {
-  if (cameraStream) {
-    const audioTrack = cameraStream.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = isAudioMuted; // Si c'était muet, on active. Si c'était actif, on coupe.
-      setIsAudioMuted(!isAudioMuted);
-    }
-  }
+// --- FONCTIONS DE TRANSITION ---
+const handleTransition = () => {
+  if (isFrozen) return;
+  const temp = programChannel;
+  setProgramChannel(previewChannel);
+  setPreviewChannel(temp);
 };
+
+const handleCut = () => {
+  if (isFrozen) return;
+  handleTransition();
+};
+
+const handleAuto = () => {
+  if (isFrozen) return;
+  handleTransition();
+};
+
+// --- MOTEUR DE CAPTURE DU PROGRAM OUT (POUR LE LIVE ET OBS) ---
+useEffect(() => {
+  let animationFrameId: number;
+  const canvas = programCanvasRef.current;
+  
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const drawProgram = () => {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (programChannel === 1 && localVideoRef.current) {
+      if (isChromaActive && chromaCanvasRef.current) {
+        ctx.drawImage(chromaCanvasRef.current, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.drawImage(localVideoRef.current, 0, 0, canvas.width, canvas.height);
+      }
+    } else if (remoteCameras[programChannel] && remoteVideoRefs.current[programChannel]) {
+      ctx.drawImage(remoteVideoRefs.current[programChannel]!, 0, 0, canvas.width, canvas.height);
+    }
+
+    if (isDskActive && customLogo) {
+      const logoImg = new Image();
+      logoImg.src = customLogo;
+      if (logoImg.complete) {
+        ctx.drawImage(logoImg, canvas.width - 150, 20, 130, 0);
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(drawProgram);
+  };
+
+  drawProgram();
+  return () => cancelAnimationFrame(animationFrameId);
+}, [programChannel, remoteCameras, isDskActive, isChromaActive, customLogo]);
+
 // --- FONCTION ENREGISTREMENT ---
 const toggleRecording = () => {
   if (isRecording) {
@@ -186,24 +213,19 @@ const toggleRecording = () => {
   } else {
     if (programCanvasRef.current) {
       try {
-        // On récupère la vidéo du mélangeur
-const canvasStream = programCanvasRef.current.captureStream(30);
-// On récupère l'audio du micro (s'il est actif)
-const audioTracks = cameraStream ? cameraStream.getAudioTracks() : [];
-// On fusionne les deux
-const combinedStream = new MediaStream([
-  ...canvasStream.getVideoTracks(),
-  ...audioTracks
-]);
-
-const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+        const canvasStream = programCanvasRef.current.captureStream(30);
+        const audioTracks = cameraStream ? cameraStream.getAudioTracks() : [];
+        const combinedStream = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...audioTracks
+        ]);
+        
+        const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
         mediaRecorderRef.current = recorder;
         recordedChunks.current = [];
 
         recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            recordedChunks.current.push(event.data);
-          }
+          if (event.data.size > 0) recordedChunks.current.push(event.data);
         };
 
         recorder.onstop = () => {
@@ -225,7 +247,7 @@ const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
         console.error("Erreur d'enregistrement :", err);
       }
     } else {
-      alert("La caméra n'est pas prête.");
+      alert("Le mélangeur n'est pas prêt.");
     }
   }
 };
@@ -243,16 +265,11 @@ const toggleLive = () => {
 
     if (programCanvasRef.current) {
       try {
-        const stream = programCanvasRef.current.captureStream(30);
-        console.log("Connexion au serveur de diffusion...", streamUrl);
         setIsLive(true);
         alert("Connexion au direct établie !");
       } catch (err) {
         console.error("Erreur lors du démarrage du live :", err);
-        alert("Impossible de démarrer le direct.");
       }
-    } else {
-      alert("Le mélangeur n'est pas encore prêt.");
     }
   }
 };
