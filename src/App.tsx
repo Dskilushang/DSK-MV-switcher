@@ -646,34 +646,37 @@ const toggleLive = () => {
               </div>
             </div>
 
-            <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all">
-              
-              {/* --- MODAL DU DIRECT (PROGRAM OUT) EN PLEIN ÉCRAN --- */}
-{isProgramViewOpen && (
-  <div className="absolute inset-0 bg-black z-[100] flex flex-col">
-    <div className="flex justify-between items-center p-4 bg-slate-900 border-b border-slate-800">
-      <h2 className="text-lg font-bold text-red-500 flex items-center gap-2">
-         <Radio className="animate-pulse" /> DIRECT (Program Out)
-      </h2>
-      <button onClick={() => setIsProgramViewOpen(false)} className="text-white text-2xl font-bold bg-slate-800 px-3 rounded">✕</button>
-    </div>
-    <div className="flex-1 flex items-center justify-center p-2 bg-black">
-      <video 
-        ref={programPreviewVideoRef} 
-        autoPlay 
-        playsInline 
-        muted 
-        className="w-full max-w-4xl aspect-video object-contain bg-slate-900 border-2 border-slate-800 rounded-lg shadow-2xl" 
-      />
-    </div>
-  </div>
-)}
+                        <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all">
               Enregistrer et Fermer
             </button>
           </div>
         </div>
       )}
 
+      {/* --- MODAL DU DIRECT (PROGRAM OUT) EN PLEIN ÉCRAN --- */}
+      {isProgramViewOpen && (
+        <div className="absolute inset-0 bg-black z-[100] flex flex-col">
+          <div className="flex justify-between items-center p-4 bg-slate-900 border-b border-slate-800">
+            <h2 className="text-lg font-bold text-red-500 flex items-center gap-2">
+               <Radio className="animate-pulse" /> DIRECT (Program Out)
+            </h2>
+            <button onClick={() => setIsProgramViewOpen(false)} className="text-white text-2xl font-bold bg-slate-800 px-3 rounded">✕</button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-2 bg-black">
+            <video 
+              ref={programPreviewVideoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              className="w-full max-w-4xl aspect-video object-contain bg-slate-900 border-2 border-slate-800 rounded-lg shadow-2xl" 
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Canvas invisible pour le Program Out (OBS / Live) */}
+      <canvas ref={programCanvasRef} width={1280} height={720} className="hidden" />
+
     </div>
   );
-}
+    }
