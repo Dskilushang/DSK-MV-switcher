@@ -647,6 +647,7 @@ const toggleLive = () => {
             </div>
 
             <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all">
+              
               {/* --- MODAL DU DIRECT (PROGRAM OUT) EN PLEIN ÉCRAN --- */}
 {isProgramViewOpen && (
   <div className="absolute inset-0 bg-black z-[100] flex flex-col">
