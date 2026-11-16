@@ -270,10 +270,11 @@ const toggleLive = () => {
   }
 };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col md:flex-row font-sans select-none overflow-hidden">
+    return (
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
+      
       {/* --- EN-TÊTE --- */}
-      <header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800">
+      <header className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 shrink-0">
         <div className="flex items-center gap-2">
           <div className="bg-red-600 p-1.5 rounded-md">
             <MonitorPlay size={18} className="text-white" />
@@ -285,35 +286,30 @@ const toggleLive = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          {/* Bouton REC */}
           <button 
             onClick={toggleRecording}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
-              isRecording 
-                ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
-                : 'bg-slate-800 text-slate-400 border border-slate-700'
+              isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800 text-slate-400 border border-slate-700'
             }`}
           >
             <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-white' : 'bg-red-500'}`} />
             {isRecording ? 'REC' : 'REC OFF'}
           </button>
 
-          {/* Bouton LIVE / OFFLINE */}
           <button 
-            onClick={() => setIsLive(!isLive)}
+            onClick={toggleLive}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold text-xs transition-all ${
-              isLive 
-                ? 'bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.6)]' 
-                : 'bg-slate-800 text-slate-400 border border-slate-700'
+              isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800 text-slate-400 border border-slate-700'
             }`}
           >
-            {isLive ? (
-              <>
-                <Radio size={14} /> LIVE
-              </>
-            ) : (
-              'OFFLINE'
-            )}
+            {isLive ? <><Radio size={14} /> LIVE</> : 'OFFLINE'}
+          </button>
+
+          <button 
+            onClick={() => setIsProgramViewOpen(true)}
+            className="p-2 text-red-500 hover:text-red-400 transition-colors animate-pulse"
+          >
+            <MonitorPlay size={20} />
           </button>
 
           <button 
@@ -324,271 +320,97 @@ const toggleLive = () => {
           </button>
         </div>
       </header>
-      <main className="flex-1 p-2 grid grid-cols-2 md:grid-cols-4 gap-2 content-start overflow-y-auto">
 
-      {/* --- MULTIVIEW (8 CAMÉRAS) --- */}
-      <main className="flex-1 p-2 grid grid-cols-2 gap-2 content-start">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => {
-          const isProgram = programChannel === channel;
-          const isPreview = previewChannel === channel;
-          
-          const borderColor = isProgram 
-            ? 'border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
-            : isPreview 
-              ? 'border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' 
-              : 'border-slate-800';
+      {/* --- ZONE PRINCIPALE (3 Colonnes) --- */}
+      <div className="flex-1 flex flex-row overflow-hidden">
+        
+        {/* COLONNE GAUCHE : Boutons d'effets */}
+        <div className="w-16 md:w-20 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-4 gap-3 overflow-y-auto shrink-0">
+          <button onClick={() => setIsChromaActive(!isChromaActive)} className={`w-12 h-12 rounded-md text-[10px] font-bold border-b-2 flex flex-col items-center justify-center ${isChromaActive ? 'bg-emerald-600 border-emerald-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'}`}>
+            CHROMA
+          </button>
+          <button onClick={() => setIsPipActive(!isPipActive)} className={`w-12 h-12 rounded-md text-[10px] font-bold border-b-2 flex flex-col items-center justify-center ${isPipActive ? 'bg-orange-600 border-orange-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'}`}>
+            PIP
+          </button>
+          <button onClick={() => setIsDskActive(!isDskActive)} className={`w-12 h-12 rounded-md text-[10px] font-bold border-b-2 flex flex-col items-center justify-center ${isDskActive ? 'bg-purple-600 border-purple-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'}`}>
+            DSK
+          </button>
+          <button onClick={() => setIsFrozen(!isFrozen)} className={`w-12 h-12 rounded-md text-[10px] font-bold border-b-2 flex flex-col items-center justify-center ${isFrozen ? 'bg-blue-600 border-blue-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'}`}>
+            <Snowflake size={14} />
+          </button>
+          <div className="w-full h-px bg-slate-700 my-2"></div>
+          <button onClick={toggleAudio} className={`w-12 h-12 rounded-md text-[10px] font-bold border-b-2 flex flex-col items-center justify-center ${isAudioMuted ? 'bg-red-600 border-red-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'}`}>
+            {isAudioMuted ? 'MUTE' : 'AUDIO'}
+          </button>
+        </div>
 
-          return (
-            <div 
-              key={channel}
-              onClick={() => !isFrozen && setPreviewChannel(channel)}
-              className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden transition-all duration-200 cursor-pointer`}
-            >
-              {/* Affichage Caméra 1 */}
-              {channel === 1 ? (
-                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-slate-900">
-                  {cameraStream ? (
-                    <>
-                      <video 
-                        ref={localVideoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted 
-                        className={`absolute inset-0 w-full h-full object-cover ${isChromaActive ? 'opacity-0' : 'opacity-80'}`}
-                      />
-                      <canvas 
-                        ref={chromaCanvasRef} 
-                        className={`absolute inset-0 w-full h-full object-cover ${isChromaActive ? 'opacity-100 bg-slate-800' : 'opacity-0 hidden'}`}
-                      />
-                    </>
-                  ) : (
-                    <button 
-                      onClick={startCamera}
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm z-20 shadow-lg animate-pulse"
-                    >
-                      Activer la Caméra
-                    </button>
-                  )}
-                </div>
-              ) : remoteCameras[channel] ? (
-                <video 
-                  ref={(el) => { remoteVideoRefs.current[channel] = el; }}
-                  src={remoteCameras[channel]} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  className="absolute inset-0 w-full h-full object-cover opacity-80"
-                />
-              ) : (
-                <div className="absolute inset-0 opacity-20 flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-              )}
-              
-              <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-xs font-bold z-10">
-                CAM {channel}
-              </div>
-              
-              {/* Badges */}
-              {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold z-10">PROGRAM</div>}
-              {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[10px] font-bold z-10">PREVIEW</div>}
+        {/* COLONNE CENTRALE : MultiView */}
+        <main className="flex-1 bg-black p-2 grid grid-cols-2 md:grid-cols-4 gap-2 content-start overflow-y-auto">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => {
+            const isProgram = programChannel === channel;
+            const isPreview = previewChannel === channel;
+            const borderColor = isProgram ? 'border-red-500' : isPreview ? 'border-green-500' : 'border-slate-800';
 
-              {/* Effet PIP */}
-              {isProgram && isPipActive && (
-                <div className="absolute bottom-4 left-4 w-1/3 aspect-video bg-slate-800 border-2 border-orange-500 rounded-md overflow-hidden shadow-2xl z-20 flex items-center justify-center">
+            return (
+              <div key={channel} onClick={() => !isFrozen && setPreviewChannel(channel)} className={`relative aspect-video bg-slate-900 rounded-lg border-2 ${borderColor} overflow-hidden cursor-pointer`}>
+                {channel === 1 ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+                    {cameraStream ? (
+                      <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                    ) : (
+                      <button onClick={startCamera} className="bg-red-600 text-white px-2 py-1 rounded text-xs z-20 animate-pulse">Activer</button>
+                    )}
+                  </div>
+                ) : remoteCameras[channel] ? (
+                  <video ref={(el) => { remoteVideoRefs.current[channel] = el; }} src={remoteCameras[channel]} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                ) : (
                   <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
-                  <span className="relative z-10 text-2xl font-black text-white/50">CAM {previewChannel}</span>
-                  <div className="absolute bottom-1 right-1 bg-orange-600 px-1.5 py-0.5 rounded text-[8px] font-bold z-10">PIP</div>
-                </div>
-              )}
-
-              {/* Indicateur Chroma */}
-              {isProgram && isChromaActive && (
-                <div className="absolute inset-0 border-4 border-emerald-500 rounded-lg pointer-events-none animate-pulse z-10">
-                  <div className="absolute top-2 left-2 bg-emerald-600 text-white px-2 py-1 rounded text-xs font-black shadow-lg">FOND VERT</div>
-                </div>
-              )}
-
-              {/* Overlay FREEZE */}
-              {isProgram && isFrozen && (
-                <div className="absolute inset-0 bg-blue-500/30 flex items-center justify-center z-30">
-                  <span className="bg-blue-600 text-white px-3 py-1 rounded font-bold text-lg flex items-center gap-2">
-                    <Snowflake size={20} /> FIGÉ
-                  </span>
-                </div>
-              )}
-
-              {/* Logo DSK */}
-              {isProgram && isDskActive && (
-                <img 
-                  src={customLogo || "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Direct8_logo.svg/200px-Direct8_logo.svg.png"} 
-                  alt="Logo" 
-                  className="absolute top-2 right-2 w-16 h-auto drop-shadow-md z-20"
-                />
-              )}
-
-              {/* VU-mètre */}
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 flex gap-0.5 px-1 opacity-80 z-10">
-                {[1, 2, 3, 4, 5].map((bar) => (
-                  <div 
-                    key={bar}
-                    className={`flex-1 rounded-sm transition-all duration-300 ${
-                      bar <= (audioLevels[channel - 1] / 20) 
-                        ? (bar >= 4 ? 'bg-red-500' : bar >= 3 ? 'bg-yellow-500' : 'bg-green-500') 
-                        : 'bg-slate-700'
-                    }`}
-                  />
-                ))}
+                )}
+                <div className="absolute top-1 left-1 bg-black/60 px-2 py-0.5 rounded text-[10px] font-bold z-10">CAM {channel}</div>
+                {isProgram && <div className="absolute bottom-1 right-1 bg-red-600 px-2 py-0.5 rounded text-[8px] font-bold z-10">PGM</div>}
+                {isPreview && <div className="absolute bottom-1 right-1 bg-green-600 px-2 py-0.5 rounded text-[8px] font-bold z-10">PVW</div>}
               </div>
-            </div>
-          );
-        })}
-      </main>
+            );
+          })}
+        </main>
 
-      {/* --- CONTRÔLES DU BAS --- */}
-<footer className="bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 pb-4 md:w-[400px] md:overflow-y-auto flex flex-col justify-end">
-        {/* T-Bar */}
-        <div className="px-4 py-2 flex items-center justify-between gap-4">
-          <div className="flex flex-col text-center">
-            <span className="text-xs font-bold text-red-500 mb-1">PROG</span>
-            <span className="text-xs font-bold text-slate-500">CAM {programChannel}</span>
+        {/* COLONNE DROITE : T-Bar et Transitions */}
+        <div className="w-20 md:w-28 bg-slate-900 border-l border-slate-800 flex flex-col items-center py-4 gap-4 shrink-0">
+          <div className="flex-1 flex items-center justify-center w-full">
+             <TBar onTransition={handleTransition} disabled={isFrozen} />
           </div>
-          <div className="flex-1 h-32 flex justify-center items-center">
-            <TBar onTransition={handleTransition} disabled={isFrozen} />
+          <div className="flex flex-col w-full px-2 gap-2">
+            <button onClick={handleCut} disabled={isFrozen} className="w-full bg-slate-700 text-white py-3 rounded font-black text-sm border-b-4 border-slate-900 active:border-b-0 active:translate-y-1">CUT</button>
+            <button onClick={handleAuto} disabled={isFrozen} className="w-full bg-blue-600 text-white py-3 rounded font-black text-sm border-b-4 border-blue-800 active:border-b-0 active:translate-y-1">AUTO</button>
           </div>
-          <div className="flex flex-col text-center">
-            <span className="text-xs font-bold text-green-500 mb-1">PREV</span>
-            <span className="text-xs font-bold text-slate-500">CAM {previewChannel}</span>
-          </div>
+        </div>
+      </div>
+
+      {/* --- BARRE INFÉRIEURE : Matrice 1-8 et Joystick --- */}
+      <footer className="h-32 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-4 shrink-0">
+        {/* Joystick */}
+        <div className="w-16 h-16 bg-slate-800 rounded-full border-4 border-slate-700 flex items-center justify-center shadow-inner">
+           <div className="w-6 h-6 bg-slate-600 rounded-full"></div>
         </div>
 
         {/* Boutons 1 à 8 */}
-        <div className="grid grid-cols-4 gap-2 px-4 mb-4">
+        <div className="flex gap-2">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((ch) => {
             const isProgram = programChannel === ch;
             const isPreview = previewChannel === ch;
             return (
-              <button
-                key={ch}
-                onClick={() => !isFrozen && setPreviewChannel(ch)}
-                disabled={isFrozen}
-                className={`py-3 rounded-md font-bold text-lg border-b-4 transition-all active:border-b-0 active:translate-y-1 ${
-                  isProgram ? 'bg-red-600 border-red-800 text-white' :
-                  isPreview ? 'bg-green-600 border-green-800 text-white' :
-                  'bg-slate-800 border-slate-950 text-slate-300'
-                } ${isFrozen ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
+              <button key={ch} onClick={() => !isFrozen && setPreviewChannel(ch)} disabled={isFrozen} className={`w-12 h-12 rounded-md font-bold text-lg border-b-4 transition-all active:border-b-0 active:translate-y-1 ${isProgram ? 'bg-red-600 border-red-800 text-white' : isPreview ? 'bg-green-600 border-green-800 text-white' : 'bg-slate-800 border-slate-900 text-slate-300'}`}>
                 {ch}
               </button>
             );
           })}
         </div>
 
-        {/* Choix Logo */}
-        <input 
-          type="file" 
-          accept="image/*" 
-          ref={fileInputRef} 
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) setCustomLogo(URL.createObjectURL(file));
-          }}
-          className="hidden" 
-        />
-        <div className="flex gap-4 px-4 mb-4">
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-md font-bold text-sm border-b-2 border-slate-950 transition-all"
-          >
-            Choisir un Logo
-          </button>
-        </div>
-
-        {/* Boutons Effets (Chroma, PIP, DSK, FREEZE) */}
-        <div className="grid grid-cols-4 gap-2 px-4 mb-4">
-          <button 
-            onClick={() => setIsChromaActive(!isChromaActive)}
-            className={`py-2 rounded-md font-bold text-[10px] border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-              isChromaActive ? 'bg-emerald-600 border-emerald-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'
-            }`}
-          >
-            {isChromaActive ? 'CHROMA ON' : 'CHROMA OFF'}
-          </button>
-          <button 
-            onClick={() => setIsPipActive(!isPipActive)}
-            className={`py-2 rounded-md font-bold text-[10px] border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-              isPipActive ? 'bg-orange-600 border-orange-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'
-            }`}
-          >
-            {isPipActive ? 'PIP ON' : 'PIP OFF'}
-          </button>
-          <button 
-            onClick={() => setIsDskActive(!isDskActive)}
-            className={`py-2 rounded-md font-bold text-[10px] border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-              isDskActive ? 'bg-purple-600 border-purple-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400'
-            }`}
-          >
-            {isDskActive ? 'DSK ON' : 'DSK OFF'}
-          </button>
-          <button 
-            onClick={() => setIsFrozen(!isFrozen)}
-            className={`py-2 rounded-md font-bold text-[10px] border-b-2 transition-all active:border-b-0 active:translate-y-0.5 flex items-center justify-center gap-1 ${
-              isFrozen ? 'bg-blue-600 border-blue-800 text-white animate-pulse' : 'bg-slate-800 border-slate-950 text-slate-400'
-            }`}
-          >
-            <Snowflake size={12} /> {isFrozen ? 'FREEZE ON' : 'FREEZE'}
-          </button>
-        </div>
-
-        {/* Sélecteur de Transition */}
-        <div className="flex justify-center gap-2 px-4 mb-3">
-          {(['cut', 'fade', 'wipe'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setTransitionType(type)}
-              className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${
-                transitionType === type ? 'bg-slate-600 text-white' : 'bg-slate-900 text-slate-500'
-              }`}
-            >
-              {type === 'cut' ? 'CUT' : type === 'fade' ? 'FONDU' : 'VOLET'}
-            </button>
-          ))
-        </div>
-            
-{/* --- CONTRÔLES AUDIO --- */}
-<div className="flex items-center gap-3 px-4 mb-3">
-  <button 
-    onClick={toggleAudio}
-    className={`px-3 py-1.5 rounded-md font-bold text-xs border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${
-      isAudioMuted 
-        ? 'bg-red-600 border-red-800 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]' 
-        : 'bg-slate-800 border-slate-950 text-slate-300'
-    }`}
-  >
-    {isAudioMuted ? 'MUTE' : 'AUDIO'}
-  </button>
-  
-  <input 
-    type="range" 
-    min="0" 
-    max="1" 
-    step="0.1" 
-    value={audioVolume}
-    onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
-    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-  />
-</div>
-                
-        {/* CUT et AUTO */}
-        <div className="flex gap-4 px-4">
-          <button onClick={handleCut} disabled={isFrozen} className={`flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-lg font-black text-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all ${isFrozen ? 'opacity-50' : ''}`}>
-            CUT
-          </button>
-          <button onClick={handleAuto} disabled={isFrozen} className={`flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-black text-xl border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 ${isFrozen ? 'opacity-50' : ''}`}>
-            <Zap size={20} /> AUTO
-          </button>
-        </div>
+        {/* Logo / Fin */}
+        <div className="w-16 text-right text-[10px] text-slate-500 font-bold">DSK-MV<br/>PRO</div>
       </footer>
 
-      {/* --- FENÊTRE DE RÉGLAGES (MODAL) --- */}
+      {/* --- MODALES --- */}
       {isSettingsOpen && (
         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-slate-800 rounded-lg p-4 w-full max-w-sm border border-slate-600 shadow-2xl my-8">
@@ -596,87 +418,43 @@ const toggleLive = () => {
               <h2 className="text-lg font-bold text-white">Réglages</h2>
               <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-white text-xl font-bold">✕</button>
             </div>
-            
-            {/* Section Caméras Wi-Fi */}
             <div className="mb-4">
               <h3 className="text-sm font-bold text-white mb-2">Caméras Distantes (Wi-Fi)</h3>
-              <p className="text-[10px] text-slate-400 mb-3">Entrez l'adresse IP ou le lien du flux vidéo.</p>
               <div className="space-y-2">
                 {[2, 3, 4, 5, 6, 7, 8].map((cam) => (
                   <div key={cam} className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-300 w-12">CAM {cam}</span>
-                    <input 
-                      type="text" 
-                      placeholder="http://192.168.1.x:8080/stream"
-                      value={remoteCameras[cam] || ''}
-                      onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})}
-                      className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
-                    />
+                    <input type="text" placeholder="http://..." value={remoteCameras[cam] || ''} onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})} className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 outline-none" />
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Section Live (Streaming) */}
             <div className="mt-6 border-t border-slate-700 pt-4">
-              <h3 className="text-sm font-bold text-white mb-2">Configuration du Direct (Live)</h3>
-              <p className="text-[10px] text-slate-400 mb-3">Entrez votre URL RTMP et votre clé de flux.</p>
-              
+              <h3 className="text-sm font-bold text-white mb-2">Configuration du Direct</h3>
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-300 w-12">URL</span>
-                  <input 
-                    type="text" 
-                    placeholder="rtmp://a.rtmp.youtube.com/live2"
-                    value={streamUrl}
-                    onChange={(e) => setStreamUrl(e.target.value)}
-                    className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-300 w-12">Clé</span>
-                  <input 
-                    type="password" 
-                    placeholder="xxxx-xxxx-xxxx-xxxx"
-                    value={streamKey}
-                    onChange={(e) => setStreamKey(e.target.value)}
-                    className="flex-1 bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 focus:border-blue-500 outline-none"
-                  />
-                </div>
+                <input type="text" placeholder="rtmp://..." value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)} className="w-full bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 outline-none" />
+                <input type="password" placeholder="Clé de flux" value={streamKey} onChange={(e) => setStreamKey(e.target.value)} className="w-full bg-slate-900 text-white text-xs px-2 py-1.5 rounded border border-slate-600 outline-none" />
               </div>
             </div>
-
-                        <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold transition-all">
-              Enregistrer et Fermer
-            </button>
+            <button onClick={() => setIsSettingsOpen(false)} className="w-full mt-6 bg-blue-600 text-white py-2 rounded font-bold">Enregistrer et Fermer</button>
           </div>
         </div>
       )}
 
-      {/* --- MODAL DU DIRECT (PROGRAM OUT) EN PLEIN ÉCRAN --- */}
       {isProgramViewOpen && (
         <div className="absolute inset-0 bg-black z-[100] flex flex-col">
           <div className="flex justify-between items-center p-4 bg-slate-900 border-b border-slate-800">
-            <h2 className="text-lg font-bold text-red-500 flex items-center gap-2">
-               <Radio className="animate-pulse" /> DIRECT (Program Out)
-            </h2>
+            <h2 className="text-lg font-bold text-red-500 flex items-center gap-2"><Radio className="animate-pulse" /> DIRECT</h2>
             <button onClick={() => setIsProgramViewOpen(false)} className="text-white text-2xl font-bold bg-slate-800 px-3 rounded">✕</button>
           </div>
           <div className="flex-1 flex items-center justify-center p-2 bg-black">
-            <video 
-              ref={programPreviewVideoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              className="w-full max-w-4xl aspect-video object-contain bg-slate-900 border-2 border-slate-800 rounded-lg shadow-2xl" 
-            />
+            <video ref={programPreviewVideoRef} autoPlay playsInline muted className="w-full max-w-4xl aspect-video object-contain bg-slate-900 border-2 border-slate-800 rounded-lg shadow-2xl" />
           </div>
         </div>
       )}
 
-      {/* Canvas invisible pour le Program Out (OBS / Live) */}
       <canvas ref={programCanvasRef} width={1280} height={720} className="hidden" />
-
     </div>
   );
-    }
+      }
+            
