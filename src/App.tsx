@@ -151,8 +151,14 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
-      
+<div className="h-screen w-screen bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden relative">
+  
+  {/* CALQUE POUR LE MODE PORTRAIT */}
+  <div className="absolute inset-0 bg-slate-950 z-[999] flex flex-col items-center justify-center text-center p-6 portrait:flex landscape:hidden">
+    <MonitorPlay size={64} className="text-red-600 mb-4 animate-bounce" />
+    <h2 className="text-2xl font-bold mb-2">Tournez votre téléphone</h2>
+    <p className="text-slate-400">Pour utiliser le mélangeur, veuillez passer en mode paysage (horizontal).</p>
+  </div>
       {/* 1. EN-TÊTE */}
       <header className="h-12 flex items-center justify-between px-3 bg-slate-900 border-b border-slate-800 shrink-0">
         <div className="flex items-center gap-2">
