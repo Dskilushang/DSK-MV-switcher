@@ -235,7 +235,6 @@ export default function App() {
    <div className="w-3 h-3 bg-slate-400 rounded-full shadow-inner"></div>
 </button>
            <div className="w-3 h-3 bg-slate-600 rounded-full"></div>
-        </div>
         <div className="flex gap-2">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((ch) => {
             const isP = programChannel === ch;
