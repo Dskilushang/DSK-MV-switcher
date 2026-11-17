@@ -228,7 +228,12 @@ export default function App() {
 
       {/* 3. BAS : Matrice + Joystick */}
       <footer className="h-16 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-4 shrink-0">
-        <div className="w-10 h-10 bg-slate-800 rounded-full border-2 border-slate-700 flex items-center justify-center">
+<button 
+  onClick={() => alert("Joystick : Utilisé pour naviguer dans les menus (Fonction à venir).")}
+  className="w-10 h-10 bg-slate-800 rounded-full border-2 border-slate-700 flex items-center justify-center active:bg-slate-700 active:border-slate-500 transition-colors cursor-pointer"
+>
+   <div className="w-3 h-3 bg-slate-400 rounded-full shadow-inner"></div>
+</button>
            <div className="w-3 h-3 bg-slate-600 rounded-full"></div>
         </div>
         <div className="flex gap-2">
