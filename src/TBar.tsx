@@ -2,10 +2,11 @@ import React, { useRef } from 'react';
 
 interface TBarProps {
   onTransition: () => void;
+  onProgress?: (progress: number) => void; // Nouvelle prop pour le fondu
   disabled?: boolean;
 }
 
-const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
+const TBar: React.FC<TBarProps> = ({ onTransition, onProgress, disabled = false }) => {
   const isDragging = useRef(false);
   const startY = useRef(0);
   const currentPos = useRef(0); 
@@ -25,24 +26,34 @@ const TBar: React.FC<TBarProps> = ({ onTransition, disabled = false }) => {
     const deltaY = startY.current - e.clientY;
     let newPos = currentPos.current + (deltaY / TRACK_HEIGHT);
     newPos = Math.max(0, Math.min(1, newPos));
+    
     if (thumbRef.current) {
       thumbRef.current.style.transform = `translateY(-${newPos * TRACK_HEIGHT}px)`;
     }
+    // On envoie la position en temps réel pour le fondu
+    if (onProgress) onProgress(newPos);
   };
 
   const handlePointerUp = () => {
     if (!isDragging.current || disabled) return;
     isDragging.current = false;
+    
     const transform = thumbRef.current?.style.transform || 'translateY(0px)';
     const match = transform.match(/translateY\(-(\d+(\.\d+)?)px\)/);
+    
     if (match) {
       const pixelsMoved = parseFloat(match[1]);
       const percent = pixelsMoved / TRACK_HEIGHT;
-      if (percent > 0.5) {
+      // Si on arrive presque en haut (80%), on valide la transition
+      if (percent > 0.8) {
         onTransition();
       }
     }
+
+    // On remet le curseur en bas et on annule le fondu
     currentPos.current = 0;
+    if (onProgress) onProgress(0); 
+    
     if (thumbRef.current) {
       thumbRef.current.style.transition = 'transform 0.2s ease-out';
       thumbRef.current.style.transform = `translateY(0px)`;
