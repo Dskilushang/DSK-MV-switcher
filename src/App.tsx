@@ -225,27 +225,27 @@ export default function App() {
           </div>
         </div>
       </div>
-
-      {/* 3. BAS : Matrice + Joystick */}
-      <footer className="h-16 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-4 shrink-0">
-<button 
-  onClick={() => alert("Joystick : Utilisé pour naviguer dans les menus (Fonction à venir).")}
-  className="w-10 h-10 bg-slate-800 rounded-full border-2 border-slate-700 flex items-center justify-center active:bg-slate-700 active:border-slate-500 transition-colors cursor-pointer"
->
-   <div className="w-3 h-3 bg-slate-400 rounded-full shadow-inner"></div>
-</button>
-           <div className="w-3 h-3 bg-slate-600 rounded-full"></div>
-        <div className="flex gap-2">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((ch) => {
-            const isP = programChannel === ch;
-            const isV = previewChannel === ch;
-            return (
-              <button key={ch} onClick={() => !isFrozen && setPreviewChannel(ch)} disabled={isFrozen} className={`w-10 h-10 rounded font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${isP ? 'bg-red-600 border-red-800 text-white' : isV ? 'bg-green-600 border-green-800 text-white' : 'bg-slate-800 border-slate-900 text-slate-300'}`}>{ch}</button>
-            );
-          })}
-        </div>
-        <div className="w-10 text-right text-[8px] text-slate-500 font-bold">DSK-MV</div>
-      </footer>
+{/* 3. BAS : Matrice + Joystick */}
+<footer className="h-16 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-4 shrink-0">
+  <button 
+    onClick={() => alert("Joystick : Utilisé pour naviguer dans les menus (Fonction à venir).")}
+    className="w-10 h-10 bg-slate-800 rounded-full border-2 border-slate-700 flex items-center justify-center active:bg-slate-700 active:border-slate-500 transition-colors cursor-pointer"
+  >
+     <div className="w-3 h-3 bg-slate-400 rounded-full shadow-inner"></div>
+  </button>
+  
+  <div className="flex gap-2">
+    {[1, 2, 3, 4, 5, 6, 7, 8].map((ch) => {
+      const isP = programChannel === ch;
+      const isV = previewChannel === ch;
+      return (
+        <button key={ch} onClick={() => !isFrozen && setPreviewChannel(ch)} disabled={isFrozen} className={`w-10 h-10 rounded font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 ${isP ? 'bg-red-600 border-red-800 text-white' : isV ? 'bg-green-600 border-green-800 text-white' : 'bg-slate-800 border-slate-900 text-slate-300'}`}>{ch}</button>
+      );
+    })}
+  </div>
+  
+  <div className="w-10 text-right text-[8px] text-slate-500 font-bold">DSK-MV</div>
+</footer>
 
       {/* MODALES */}
       {isSettingsOpen && (
