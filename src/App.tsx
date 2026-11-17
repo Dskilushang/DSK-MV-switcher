@@ -74,14 +74,15 @@ export default function App() {
   }, []);
 
   const toggleAudio = () => {
-    if (cameraStream) {
-      const track = cameraStream.getAudioTracks()[0];
-      if (track) {
-        track.enabled = isAudioMuted;
-        setIsAudioMuted(!isAudioMuted);
-      }
+  if (cameraStream) {
+    const track = cameraStream.getAudioTracks()[0];
+    if (track) {
+      track.enabled = isAudioMuted;
     }
-  };
+  }
+  // On change l'état visuel dans tous les cas
+  setIsAudioMuted(!isAudioMuted); 
+};
 
   // --- PROGRAM OUT (OBS) ---
   useEffect(() => {
