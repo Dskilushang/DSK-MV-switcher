@@ -17,6 +17,7 @@ type SceneCallback = (sceneName: string) => void;
 
 let onStatusChange: StatusCallback | null = null;
 let onSceneChange: SceneCallback | null = null;
+let callbacksRegistered = false;
 
 export function registerCallbacks(
   statusCb: StatusCallback,
@@ -25,13 +26,12 @@ export function registerCallbacks(
   onStatusChange = statusCb;
   onSceneChange = sceneCb;
 
-  // Écoute des événements OBS
+  // Enregistrer les écouteurs une seule fois pour éviter les doublons.
+  if (callbacksRegistered) return;
+  callbacksRegistered = true;
+
   obs.on('ConnectionClosed', () => {
     onStatusChange?.('disconnected', 'Connexion fermée');
-  });
-
-  obs.on('ConnectionError', (err) => {
-    onStatusChange?.('error', err.message);
   });
 
   obs.on('CurrentProgramSceneChanged', (data) => {
@@ -42,7 +42,14 @@ export function registerCallbacks(
 export async function connectObs(config: ObsConfig): Promise<boolean> {
   onStatusChange?.('connecting');
   try {
-    const url = `ws://${config.host}:${config.port}`;
+    const host = config.host.trim().replace(/^wss?:\\/\\//i, '').replace(/\\/+$/, '');
+    const port = Number(config.port);
+    if (!host) throw new Error('Adresse IP ou nom d’hôte OBS requis.');
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error('Le port OBS doit être compris entre 1 et 65535.');
+    }
+
+    const url = `ws://${host}:${port}`;
     await obs.connect(url, config.password || undefined);
 
     // Récupérer la scène actuelle au démarrage
@@ -82,4 +89,4 @@ export async function setProgramScene(sceneName: string): Promise<void> {
 export async function getSceneList(): Promise<string[]> {
   const { scenes } = await obs.call('GetSceneList');
   return scenes.map((s) => String(s.sceneName));
-  }
+}
