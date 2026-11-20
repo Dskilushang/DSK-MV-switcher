@@ -42,7 +42,7 @@ export function registerCallbacks(
 export async function connectObs(config: ObsConfig): Promise<boolean> {
   onStatusChange?.('connecting');
   try {
-    const host = config.host.trim().replace(/^wss?:\\/\\//i, '').replace(/\\/+$/, '');
+    const host = config.host.trim().replace(/^wss?:\/\//i, '').replace(/\/+$/, '');
     const port = Number(config.port);
     if (!host) throw new Error('Adresse IP ou nom d’hôte OBS requis.');
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
