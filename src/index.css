@@ -1,3 +1,111 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Mise en page adaptative : téléphones et tablettes en mode portrait. */
+@media (orientation: portrait) {
+  #root,
+  #root > div {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+  }
+
+  #root > div > header + div {
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column !important;
+  }
+
+  /* Barre des effets : passe de la colonne gauche à une rangée supérieure. */
+  #root > div > header + div > div:first-child {
+    width: 100% !important;
+    min-height: 46px;
+    height: 46px;
+    padding: 3px 6px !important;
+    flex-direction: row !important;
+    justify-content: space-around;
+    border-right: 0;
+    border-bottom: 1px solid rgb(30 41 59);
+  }
+
+  #root > div > header + div > div:first-child button {
+    width: auto !important;
+    min-width: 48px;
+    height: 38px;
+    padding: 0 6px;
+  }
+
+  /* Multiview : 2 colonnes pour conserver des vignettes lisibles. */
+  #root > div > header + div > main {
+    width: 100%;
+    min-height: 0;
+    min-width: 0;
+    flex: 1 1 0%;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  /* T-Bar et transitions : barre inférieure compacte. */
+  #root > div > header + div > div:last-child {
+    width: 100% !important;
+    height: 94px;
+    min-height: 94px;
+    padding: 3px 10px !important;
+    flex-direction: row !important;
+    border-left: 0;
+    border-top: 1px solid rgb(30 41 59);
+    gap: 12px;
+  }
+
+  #root > div > header + div > div:last-child > div:first-child {
+    width: auto;
+    min-width: 54px;
+    height: 100%;
+    flex: 1 1 auto;
+  }
+
+  #root > div > header + div > div:last-child > div:last-child {
+    width: auto;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #root > div > header + div > div:last-child button {
+    min-width: 58px;
+    padding: 8px 10px;
+  }
+
+  /* Respect des zones système sur les téléphones à bords arrondis. */
+  #root > div > footer {
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Petits écrans en paysage : réduire les panneaux latéraux sans changer le bureau. */
+@media (orientation: landscape) and (max-height: 500px) {
+  #root > div > header {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  #root > div > header + div > div:first-child {
+    width: 54px !important;
+  }
+
+  #root > div > header + div > div:first-child button {
+    width: 44px !important;
+    height: 34px;
+  }
+
+  #root > div > header + div > div:last-child {
+    width: 66px !important;
+  }
+
+  #root > div > footer {
+    height: 58px;
+    min-height: 58px;
+  }
+}
