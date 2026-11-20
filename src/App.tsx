@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
+import { connectObs, disconnectObs, registerCallbacks, type ObsStatus } from './services/obsService';
 
 export default function App() {
   // --- ÉTATS DU MÉLANGEUR ---
@@ -37,6 +38,12 @@ export default function App() {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [obsHost, setObsHost] = useState('192.168.1.100');
+  const [obsPort, setObsPort] = useState('4455');
+  const [obsPassword, setObsPassword] = useState('');
+  const [obsStatus, setObsStatus] = useState<ObsStatus>('disconnected');
+  const [obsMessage, setObsMessage] = useState('Non connecté');
+  const [obsCurrentScene, setObsCurrentScene] = useState('');
 
   // --- CANVAS & LIVE ---
   const [streamKey, setStreamKey] = useState('');
@@ -48,6 +55,28 @@ export default function App() {
   const recordedChunks = useRef<Blob[]>([]);
   const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
   const chromaAnimationRef = useRef<number | null>(null);
+
+  // --- CONNEXION OBS ---
+  useEffect(() => {
+    registerCallbacks(
+      (status, message) => {
+        setObsStatus(status);
+        if (message) setObsMessage(message);
+        else if (status === 'connecting') setObsMessage('Connexion à OBS…');
+      },
+      (sceneName) => setObsCurrentScene(sceneName)
+    );
+    return () => { void disconnectObs(); };
+  }, []);
+
+  const handleObsConnect = async () => {
+    const connected = await connectObs({
+      host: obsHost,
+      port: Number(obsPort),
+      password: obsPassword
+    });
+    if (!connected) setObsCurrentScene('');
+  };
 
   // --- INITIALISATION ---
   const startCamera = async () => {
@@ -397,6 +426,28 @@ export default function App() {
               <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <X size={24} />
               </button>
+            </div>
+
+            {/* CONNEXION OBS WEBSOCKET */}
+            <div className="mb-4 bg-slate-900 p-3 rounded border border-slate-700">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-white">CONNEXION OBS STUDIO</p>
+                <span className={`text-[10px] font-bold ${obsStatus === 'connected' ? 'text-green-400' : obsStatus === 'error' ? 'text-red-400' : obsStatus === 'connecting' ? 'text-amber-400' : 'text-slate-400'}`}>
+                  {obsStatus === 'connected' ? 'CONNECTÉ' : obsStatus === 'connecting' ? 'CONNEXION…' : obsStatus === 'error' ? 'ERREUR' : 'HORS LIGNE'}
+                </span>
+              </div>
+              <label className="block text-[10px] text-slate-400 mb-1">Adresse IP / hôte OBS</label>
+              <input type="text" value={obsHost} onChange={(e) => setObsHost(e.target.value)} placeholder="192.168.1.100" className="w-full mb-2 bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
+              <label className="block text-[10px] text-slate-400 mb-1">Port WebSocket</label>
+              <input type="number" min="1" max="65535" value={obsPort} onChange={(e) => setObsPort(e.target.value)} className="w-full mb-2 bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
+              <label className="block text-[10px] text-slate-400 mb-1">Mot de passe OBS (si activé)</label>
+              <input type="password" value={obsPassword} onChange={(e) => setObsPassword(e.target.value)} placeholder="Mot de passe WebSocket" className="w-full mb-2 bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
+              <p className="text-[10px] text-slate-400 mb-2">{obsMessage}{obsCurrentScene ? ` · Scène : ${obsCurrentScene}` : ''}</p>
+              <div className="flex gap-2">
+                <button onClick={handleObsConnect} disabled={obsStatus === 'connecting'} className="flex-1 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">CONNECTER</button>
+                <button onClick={() => { void disconnectObs(); }} disabled={obsStatus !== 'connected'} className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">DÉCONNECTER</button>
+              </div>
+              <p className="text-[9px] text-slate-500 mt-2">OBS Studio doit être ouvert, avec le serveur WebSocket activé (port par défaut : 4455).</p>
             </div>
 
             {/* Import Logo Stylisé */}
