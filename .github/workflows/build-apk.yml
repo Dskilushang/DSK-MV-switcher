@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -25,6 +27,9 @@ jobs:
 
       - name: Installer les dépendances
         run: npm install
+
+      - name: Vérifier les types TypeScript
+        run: npx tsc --noEmit
 
       - name: Compiler l'application web (Vite)
         run: npm run build

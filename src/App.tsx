@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
-import { connectObs, disconnectObs, registerCallbacks, type ObsStatus } from './services/obsService';
+import { connectObs, disconnectObs, getSceneList, registerCallbacks, setProgramScene, type ObsStatus } from './services/obsService';
 
 export default function App() {
   // --- ÉTATS DU MÉLANGEUR ---
@@ -44,6 +44,9 @@ export default function App() {
   const [obsStatus, setObsStatus] = useState<ObsStatus>('disconnected');
   const [obsMessage, setObsMessage] = useState('Non connecté');
   const [obsCurrentScene, setObsCurrentScene] = useState('');
+  const [obsScenes, setObsScenes] = useState<string[]>([]);
+  const [isLoadingObsScenes, setIsLoadingObsScenes] = useState(false);
+  const [obsActionMessage, setObsActionMessage] = useState('');
 
   // --- CANVAS & LIVE ---
   const [streamKey, setStreamKey] = useState('');
@@ -69,13 +72,44 @@ export default function App() {
     return () => { void disconnectObs(); };
   }, []);
 
+  const refreshObsScenes = async () => {
+    setIsLoadingObsScenes(true);
+    setObsActionMessage('');
+    try {
+      const scenes = await getSceneList();
+      setObsScenes(scenes);
+      setObsActionMessage(`${scenes.length} scène(s) récupérée(s).`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible de récupérer les scènes.';
+      setObsActionMessage(message);
+    } finally {
+      setIsLoadingObsScenes(false);
+    }
+  };
+
+  const handleObsSceneSelect = async (sceneName: string) => {
+    try {
+      await setProgramScene(sceneName);
+      setObsCurrentScene(sceneName);
+      setObsActionMessage(`Scène active : ${sceneName}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible de changer de scène.';
+      setObsActionMessage(message);
+    }
+  };
+
   const handleObsConnect = async () => {
     const connected = await connectObs({
       host: obsHost,
       port: Number(obsPort),
       password: obsPassword
     });
-    if (!connected) setObsCurrentScene('');
+    if (connected) {
+      await refreshObsScenes();
+    } else {
+      setObsCurrentScene('');
+      setObsScenes([]);
+    }
   };
 
   // --- INITIALISATION ---
@@ -443,9 +477,31 @@ export default function App() {
               <label className="block text-[10px] text-slate-400 mb-1">Mot de passe OBS (si activé)</label>
               <input type="password" value={obsPassword} onChange={(e) => setObsPassword(e.target.value)} placeholder="Mot de passe WebSocket" className="w-full mb-2 bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
               <p className="text-[10px] text-slate-400 mb-2">{obsMessage}{obsCurrentScene ? ` · Scène : ${obsCurrentScene}` : ''}</p>
+              {obsStatus === 'connected' && (
+                <div className="mt-3 border-t border-slate-700 pt-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <p className="text-[10px] font-bold text-slate-300">SCÈNES OBS</p>
+                    <button onClick={() => void refreshObsScenes()} disabled={isLoadingObsScenes} className="text-[10px] font-bold text-blue-400 disabled:opacity-50">
+                      {isLoadingObsScenes ? 'CHARGEMENT…' : 'ACTUALISER'}
+                    </button>
+                  </div>
+                  {obsScenes.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {obsScenes.map((scene) => (
+                        <button key={scene} onClick={() => void handleObsSceneSelect(scene)} disabled={isLoadingObsScenes} className={`rounded px-2 py-2 text-left text-[10px] font-bold border disabled:opacity-50 ${obsCurrentScene === scene ? 'bg-green-700 border-green-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-300'}`}>
+                          {scene}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500">Aucune scène chargée. Actualisez la liste.</p>
+                  )}
+                  {obsActionMessage && <p className="text-[10px] text-slate-400 mt-2">{obsActionMessage}</p>}
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={handleObsConnect} disabled={obsStatus === 'connecting'} className="flex-1 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">CONNECTER</button>
-                <button onClick={() => { void disconnectObs(); }} disabled={obsStatus !== 'connected'} className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">DÉCONNECTER</button>
+                <button onClick={() => { void disconnectObs(); setObsScenes([]); setObsCurrentScene(''); setObsActionMessage(''); }} disabled={obsStatus !== 'connected'} className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">DÉCONNECTER</button>
               </div>
               <p className="text-[9px] text-slate-500 mt-2">OBS Studio doit être ouvert, avec le serveur WebSocket activé (port par défaut : 4455).</p>
             </div>
