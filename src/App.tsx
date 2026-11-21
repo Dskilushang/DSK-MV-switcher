@@ -128,14 +128,14 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
-        audio: true
+        audio: false
       });
       setCameraStream(stream);
       setCameraStatus('active');
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Échec de l'activation de la caméra.");
       const messages: Record<string, string> = {
-        NotAllowedError: "Autorisation caméra ou microphone refusée. Vérifiez les autorisations Android de l'application.",
+        NotAllowedError: "Accès caméra refusé par Android. Vérifiez l'autorisation Caméra de l'application.",
         NotFoundError: "Aucune caméra compatible n'a été détectée sur cet appareil.",
         NotReadableError: "La caméra est déjà utilisée par une autre application ou n'est pas accessible.",
         OverconstrainedError: "La caméra arrière demandée n'est pas disponible."

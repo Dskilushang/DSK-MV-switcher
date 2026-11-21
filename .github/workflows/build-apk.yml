@@ -58,7 +58,6 @@ jobs:
 
           required_permissions = [
               "android.permission.CAMERA",
-              "android.permission.RECORD_AUDIO",
           ]
           missing_permissions = [
               permission for permission in required_permissions
