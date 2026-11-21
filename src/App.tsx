@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
+import DskPanel, { type DskLayer } from './DskPanel';
 import { connectObs, disconnectObs, getSceneList, registerCallbacks, setProgramScene, type ObsStatus } from './services/obsService';
 
 export default function App() {
@@ -14,6 +15,14 @@ export default function App() {
   const [isChromaActive, setIsChromaActive] = useState(false);
   const [isPipActive, setIsPipActive] = useState(false);
   const [isLogoActive, setIsLogoActive] = useState(false); // Contrôle l'affichage du logo
+  const [isDskPanelOpen, setIsDskPanelOpen] = useState(false);
+  const [dskLayers, setDskLayers] = useState<DskLayer[]>([
+    { id: 1, name: 'LOGO', type: 'image', content: '', enabled: false, x: 82, y: 8, opacity: 1, fontSize: 32 },
+    { id: 2, name: 'BANDEAU', type: 'text', content: '', enabled: false, x: 5, y: 82, opacity: 1, fontSize: 28 },
+    { id: 3, name: 'TEXTE', type: 'text', content: '', enabled: false, x: 5, y: 8, opacity: 1, fontSize: 28 },
+    { id: 4, name: 'GRAPHIQUE', type: 'image', content: '', enabled: false, x: 65, y: 68, opacity: 1, fontSize: 24 }
+  ]);
+  const dskImageCacheRef = useRef<Record<number, { src: string; image: HTMLImageElement }>>({});
   const [isFrozen, setIsFrozen] = useState(false);
 
   // --- JOYSTICK & T-BAR ---
@@ -254,19 +263,56 @@ export default function App() {
       if (isLogoActive && customLogo) {
         const logoImg = new Image();
         logoImg.src = customLogo;
-        if (logoImg.complete) {
-          const lWidth = 120; 
+        if (logoImg.complete && logoImg.naturalWidth > 0) {
+          const lWidth = 120;
           const lHeight = (logoImg.height / logoImg.width) * lWidth;
           const posX = (logoPos.x / 100) * canvas.width;
           const posY = (logoPos.y / 100) * canvas.height;
           ctx.drawImage(logoImg, posX, posY, lWidth, lHeight);
         }
       }
+
+      // DSK: four independent downstream graphic layers, composited over the program.
+      dskLayers.forEach((layer) => {
+        if (!layer.enabled || !layer.content.trim()) return;
+        const x = (layer.x / 100) * canvas.width;
+        const y = (layer.y / 100) * canvas.height;
+        ctx.save();
+        ctx.globalAlpha = layer.opacity;
+        if (layer.type === 'text') {
+          ctx.font = `700 ${layer.fontSize}px Arial, sans-serif`;
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = 'rgba(0,0,0,0.85)';
+          ctx.shadowBlur = 5;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+          ctx.fillText(layer.content.slice(0, 120), x, y, canvas.width * 0.9);
+        } else {
+          let cached = dskImageCacheRef.current[layer.id];
+          if (!cached || cached.src !== layer.content) {
+            const image = new Image();
+            image.src = layer.content;
+            cached = { src: layer.content, image };
+            dskImageCacheRef.current[layer.id] = cached;
+          }
+          const image = cached.image;
+          if (image.complete && image.naturalWidth > 0) {
+            const maxWidth = canvas.width * 0.28;
+            const maxHeight = canvas.height * 0.24;
+            const scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight, 1);
+            const width = image.naturalWidth * scale;
+            const height = image.naturalHeight * scale;
+            ctx.drawImage(image, x, y, width, height);
+          }
+        }
+        ctx.restore();
+      });
       frameId = requestAnimationFrame(draw);
     };
     draw();
     return () => cancelAnimationFrame(frameId);
-  }, [programChannel, previewChannel, remoteCameras, programZoom, isLogoActive, customLogo, logoPos, tBarProgress, isFrozen, isChromaActive]);
+  }, [programChannel, previewChannel, remoteCameras, programZoom, isLogoActive, customLogo, logoPos, tBarProgress, isFrozen, isChromaActive, dskLayers]);
 
   // --- PREVIEW DIRECT ---
   useEffect(() => {
@@ -382,8 +428,9 @@ export default function App() {
           <button onClick={() => setIsChromaActive(!isChromaActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isChromaActive ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>CHROMA</button>
           <button onClick={() => setIsPipActive(!isPipActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isPipActive ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-400'}`}>PIP</button>
           
-          {/* LOGO : Contrôle l'affichage */}
+          {/* Ancien raccourci logo conservé pour compatibilité */}
           <button onClick={() => setIsLogoActive(!isLogoActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isLogoActive ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>LOGO</button>
+          <button onClick={() => setIsDskPanelOpen(true)} className="w-12 h-10 rounded text-[9px] font-bold bg-amber-700 text-white border border-amber-500">DSK</button>
           
           <button onClick={() => setIsFrozen(!isFrozen)} className={`w-12 h-10 rounded text-[9px] font-bold ${isFrozen ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>FREEZE</button>
           <button onClick={toggleAudio} className={`w-12 h-10 rounded text-[9px] font-bold ${isAudioMuted ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>AUDIO</button>
@@ -578,6 +625,14 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {isDskPanelOpen && (
+        <DskPanel
+          layers={dskLayers}
+          onChange={setDskLayers}
+          onClose={() => setIsDskPanelOpen(false)}
+        />
       )}
 
       {isProgramViewOpen && (
