@@ -52,7 +52,7 @@ jobs:
               raise SystemExit(f"Manifeste Android introuvable : {manifest}")
 
           source = manifest.read_text(encoding="utf-8")
-          manifest_opening = re.search(r"<manifest\\b[^>]*>", source, re.DOTALL)
+          manifest_opening = re.search(r"<manifest\b[^>]*>", source, re.DOTALL)
           if manifest_opening is None:
               raise SystemExit("Balise manifest introuvable")
 
@@ -66,7 +66,7 @@ jobs:
           ]
           if missing_permissions:
               permission_xml = "".join(
-                  f'\\n    <uses-permission android:name="{permission}" />'
+                  f'\n    <uses-permission android:name="{permission}" />'
                   for permission in missing_permissions
               )
               insert_at = manifest_opening.end()
