@@ -52,6 +52,25 @@ jobs:
               raise SystemExit(f"Manifeste Android introuvable : {manifest}")
 
           source = manifest.read_text(encoding="utf-8")
+          manifest_opening = re.search(r"<manifest\b[^>]*>", source, re.DOTALL)
+          if manifest_opening is None:
+              raise SystemExit("Balise manifest introuvable")
+
+          required_permissions = [
+              "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
+          ]
+          missing_permissions = [
+              permission for permission in required_permissions
+              if f'android:name="{permission}"' not in source
+          ]
+          if missing_permissions:
+              permission_xml = "".join(
+                  f'\n    <uses-permission android:name="{permission}" />'
+                  for permission in missing_permissions
+              )
+              insert_at = manifest_opening.end()
+              source = source[:insert_at] + permission_xml + source[insert_at:]
           activity_pattern = re.compile(r"<activity\b[^>]*>.*?</activity>", re.DOTALL)
           matches = list(activity_pattern.finditer(source))
           launchers = [
