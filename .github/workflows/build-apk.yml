@@ -52,7 +52,7 @@ jobs:
               raise SystemExit(f"Manifeste Android introuvable : {manifest}")
 
           source = manifest.read_text(encoding="utf-8")
-          activity_pattern = re.compile(r"<activity\\b[^>]*>.*?</activity>", re.DOTALL)
+          activity_pattern = re.compile(r"<activity\b[^>]*>.*?</activity>", re.DOTALL)
           matches = list(activity_pattern.finditer(source))
           launchers = [
               match for match in matches
@@ -63,11 +63,11 @@ jobs:
               raise SystemExit(f"Une seule Activity MAIN/LAUNCHER attendue, trouvé : {len(launchers)}")
 
           match = launchers[0]
-          opening = re.search(r"<activity\\b[^>]*>", match.group(0), re.DOTALL)
+          opening = re.search(r"<activity\b[^>]*>", match.group(0), re.DOTALL)
           if opening is None:
               raise SystemExit("Balise Activity principale introuvable")
 
-          tag = re.sub(r'\\s+android:screenOrientation="[^"]*"', "", opening.group(0))
+          tag = re.sub(r'\s+android:screenOrientation="[^"]*"', "", opening.group(0))
           tag = tag[:-1] + ' android:screenOrientation="landscape">'
           updated_activity = match.group(0)[:opening.start()] + tag + match.group(0)[opening.end():]
           updated = source[:match.start()] + updated_activity + source[match.end():]
