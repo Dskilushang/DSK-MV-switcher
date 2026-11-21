@@ -40,6 +40,62 @@ jobs:
       - name: Synchroniser Capacitor
         run: npx cap sync android
 
+      - name: Verrouiller Android en mode paysage
+        run: |
+          python - <<'PY'
+          import re
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if not manifest.is_file():
+              raise SystemExit(f"Manifeste Android introuvable : {manifest}")
+
+          source = manifest.read_text(encoding="utf-8")
+          activity_pattern = re.compile(r"<activity\\b[^>]*>.*?</activity>", re.DOTALL)
+          matches = list(activity_pattern.finditer(source))
+          launchers = [
+              match for match in matches
+              if "android.intent.action.MAIN" in match.group(0)
+              and "android.intent.category.LAUNCHER" in match.group(0)
+          ]
+          if len(launchers) != 1:
+              raise SystemExit(f"Une seule Activity MAIN/LAUNCHER attendue, trouvé : {len(launchers)}")
+
+          match = launchers[0]
+          opening = re.search(r"<activity\\b[^>]*>", match.group(0), re.DOTALL)
+          if opening is None:
+              raise SystemExit("Balise Activity principale introuvable")
+
+          tag = re.sub(r'\\s+android:screenOrientation="[^"]*"', "", opening.group(0))
+          tag = tag[:-1] + ' android:screenOrientation="landscape">'
+          updated_activity = match.group(0)[:opening.start()] + tag + match.group(0)[opening.end():]
+          updated = source[:match.start()] + updated_activity + source[match.end():]
+
+          root = ET.fromstring(updated)
+          ns = "{http://schemas.android.com/apk/res/android}"
+          verified = []
+          for activity in root.findall("application/activity"):
+              has_main = any(
+                  item.attrib.get(ns + "name") == "android.intent.action.MAIN"
+                  for filt in activity.findall("intent-filter")
+                  for item in filt.findall("action")
+              )
+              has_launcher = any(
+                  item.attrib.get(ns + "name") == "android.intent.category.LAUNCHER"
+                  for filt in activity.findall("intent-filter")
+                  for item in filt.findall("category")
+              )
+              if has_main and has_launcher and activity.attrib.get(ns + "screenOrientation") == "landscape":
+                  verified.append(activity)
+
+          if len(verified) != 1:
+              raise SystemExit("Échec de vérification : l'Activity de lancement n'est pas en paysage")
+
+          manifest.write_text(updated, encoding="utf-8")
+          print("OK : Activity principale Android verrouillée en landscape.")
+          PY
+
       - name: Compiler l'APK (Debug)
         working-directory: android
         run: |
