@@ -28,6 +28,8 @@ export default function App() {
 
   // --- CAMÉRAS & AUDIO ---
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'error'>('idle');
+  const [cameraError, setCameraError] = useState('');
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
   const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
@@ -112,24 +114,53 @@ export default function App() {
     }
   };
 
-  // --- INITIALISATION ---
+  // --- CAMÉRA LOCALE ---
   const startCamera = async () => {
+    if (cameraStatus === 'requesting' || cameraStream) return;
+    setCameraError('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus('error');
+      setCameraError("L'accès caméra n'est pas disponible dans ce contexte Android.");
+      return;
+    }
+
+    setCameraStatus('requesting');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, audio: true 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: true
       });
       setCameraStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(e => console.log(e));
-      }
-    } catch (err) { console.error(err); }
+      setCameraStatus('active');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error("Échec de l'activation de la caméra.");
+      const messages: Record<string, string> = {
+        NotAllowedError: "Autorisation caméra ou microphone refusée. Vérifiez les autorisations Android de l'application.",
+        NotFoundError: "Aucune caméra compatible n'a été détectée sur cet appareil.",
+        NotReadableError: "La caméra est déjà utilisée par une autre application ou n'est pas accessible.",
+        OverconstrainedError: "La caméra arrière demandée n'est pas disponible."
+      };
+      setCameraStatus('error');
+      setCameraError(messages[error.name] || error.message || "Impossible d'activer la caméra.");
+    }
   };
 
   useEffect(() => {
-    startCamera();
-    return () => { if (cameraStream) cameraStream.getTracks().forEach(track => track.stop()); };
-  }, []);
+    if (!cameraStream || !localVideoRef.current) return;
+    const video = localVideoRef.current;
+    video.srcObject = cameraStream;
+    void video.play().catch(() => {
+      setCameraError("Le flux caméra est actif, mais la lecture vidéo a échoué.");
+      setCameraStatus('error');
+    });
+    return () => { video.srcObject = null; };
+  }, [cameraStream]);
+
+  useEffect(() => {
+    return () => {
+      cameraStream?.getTracks().forEach(track => track.stop());
+    };
+  }, [cameraStream]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -367,7 +398,7 @@ export default function App() {
               <div key={channel} onClick={() => !isFrozen && setPreviewChannel(channel)} className={`relative bg-slate-900 rounded border-2 ${isP ? 'border-red-500' : isV ? 'border-green-500' : 'border-slate-800'} overflow-hidden cursor-pointer pointer-events-auto`}>
                 {channel === 1 ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                    {cameraStream ? <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /> : <button onClick={startCamera} className="bg-red-600 text-white px-2 py-1 rounded text-[10px] z-20 pointer-events-auto">Activer</button>}
+                    {cameraStream ? <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /> : <div className="z-20 flex flex-col items-center gap-1 px-1"><button onClick={(event) => { event.stopPropagation(); void startCamera(); }} disabled={cameraStatus === 'requesting'} className="bg-red-600 disabled:bg-slate-600 text-white px-2 py-1 rounded text-[10px] pointer-events-auto">{cameraStatus === 'requesting' ? 'Activation…' : 'Activer'}</button>{cameraError && <span role="alert" className="max-w-full text-center text-[8px] leading-tight text-red-300">{cameraError}</span>}</div>}
                   </div>
                 ) : remoteCameras[channel] ? (
                   <video ref={(el) => { remoteVideoRefs.current[channel] = el; }} src={remoteCameras[channel]} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
