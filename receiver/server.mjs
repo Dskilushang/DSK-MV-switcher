@@ -1,10 +1,8 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 
-const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const HOST = process.env.DSK_RECEIVER_HOST || '0.0.0.0';
 const PORT = Number(process.env.DSK_RECEIVER_PORT || 8765);
 const VALID_STREAMS = new Set(['pgm', ...Array.from({ length: 8 }, (_, index) => `iso-${index + 1}`)]);
@@ -38,7 +36,6 @@ function start(){
       if(message.type==='offer'&&message.sdp){
         if(peer)peer.close();
         peer=new RTCPeerConnection({iceServers:[]});
-        pendingCandidates=[];
         peer.ontrack=(trackEvent)=>{
           audio.srcObject=trackEvent.streams[0]||new MediaStream([trackEvent.track]);
           audio.play().then(()=>setState('REÇU')).catch(()=>setState('AUTORISATION AUDIO REQUISE'));
