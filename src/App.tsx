@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type ChangeEvent } from 'react';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
@@ -37,7 +37,7 @@ export default function App() {
     if (!route) setMediaAudioRoutedChannel(null);
   }, []);
 
-  const handleMediaFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const nextUrl = URL.createObjectURL(file);
