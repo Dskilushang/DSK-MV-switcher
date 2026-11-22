@@ -31,7 +31,7 @@ export default function App() {
   // --- JOYSTICK & T-BAR ---
   const [transitionSpeed, setTransitionSpeed] = useState(1000);
   const [programZoom, setProgramZoom] = useState(1);
-  const [tBarProgress, setTBarProgress] = useState(0);
+  const tBarProgressRef = useRef(0);
   const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
   const autoTransitionFrameRef = useRef<number | null>(null);
   const [logoPos, setLogoPos] = useState({ x: 50, y: 10 });
@@ -287,9 +287,9 @@ export default function App() {
         ctx.globalAlpha = 1.0;
       };
 
-      if (tBarProgress > 0) {
+      if (tBarProgressRef.current > 0) {
         drawSource(programChannel, 1);
-        drawSource(previewChannel, tBarProgress);
+        drawSource(previewChannel, tBarProgressRef.current);
       } else {
         drawSource(programChannel, 1);
       }
@@ -347,7 +347,7 @@ export default function App() {
     };
     draw();
     return () => cancelAnimationFrame(frameId);
-  }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, tBarProgress, isFrozen, isChromaActive, dskLayers]);
+  }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, dskLayers]);
 
   // --- PREVIEW DIRECT ---
   useEffect(() => {
@@ -364,7 +364,7 @@ export default function App() {
     if (isFrozen) return;
     setProgramChannel(previewChannel);
     setPreviewChannel(programChannel);
-    setTBarProgress(0);
+    tBarProgressRef.current = 0;
   };
 
   // AUTO : fondu progressif piloté par la durée réglée au joystick.
@@ -381,11 +381,11 @@ export default function App() {
     const animate = (timestamp: number) => {
       if (startedAt === null) startedAt = timestamp;
       const progress = Math.min(1, (timestamp - startedAt) / duration);
-      setTBarProgress(progress);
+      tBarProgressRef.current = progress;
 
       if (progress >= 1) {
         autoTransitionFrameRef.current = null;
-        setTBarProgress(0);
+        tBarProgressRef.current = 0;
         setProgramChannel(previewChannel);
         setPreviewChannel(programChannel);
         setIsAutoTransitioning(false);
@@ -538,7 +538,7 @@ export default function App() {
         <div className="w-20 bg-slate-900 border-l border-slate-800 flex flex-col items-center py-2 justify-between shrink-0">
           <div className="flex-1 flex items-center justify-center w-full">
             {/* T-BAR TOUJOURS ACTIVE */}
-            <TBar onTransition={handleTransition} onProgress={(progress) => setTBarProgress(progress)} disabled={isFrozen || isAutoTransitioning} />
+            <TBar onTransition={handleTransition} onProgress={(progress) => { tBarProgressRef.current = progress; }} disabled={isFrozen || isAutoTransitioning} />
           </div>
           <div className="flex flex-col w-full px-1 gap-1">
             <button onClick={handleTransition} disabled={isFrozen || isAutoTransitioning} className="w-full bg-slate-700 disabled:opacity-40 text-white py-2 rounded font-black text-xs border-b-2 border-slate-900 active:border-b-0">CUT</button>
