@@ -106,7 +106,11 @@ export default function App() {
           setLiveMessage('Connexion OBS fermée.');
         }
       },
-      (sceneName) => setObsCurrentScene(sceneName)
+      (sceneName) => setObsCurrentScene(sceneName),
+      (active) => {
+        setIsLive(active);
+        setLiveMessage(active ? 'Diffusion OBS active.' : 'Diffusion OBS arrêtée.');
+      }
     );
     return () => { void disconnectObs(); };
   }, []);
