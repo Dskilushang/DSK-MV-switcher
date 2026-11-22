@@ -376,7 +376,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
         <div className="grid min-h-0 flex-1 grid-cols-8 gap-1 overflow-x-auto overflow-y-auto p-2">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
-            const isMediaChannel = mediaChannelsRef.current.has(channelId);\n            const connected = streamsRef.current.has(channelId) || isMediaChannel;
+            const isMediaChannel = mediaChannelsRef.current.has(channelId);
+            const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
               <article key={channelId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
