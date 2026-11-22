@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine, type AudioChannelSnapshot, type AudioInputDevice, type AudioMeterReading } from './audio/AudioEngine';
+import AudioNetworkPanel from './AudioNetworkPanel';
 
 type AudioMixerPanelProps = {
   open: boolean;
@@ -271,6 +272,8 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
         </header>
 
         {error && <div role="alert" className="border-b border-red-900 bg-red-950/70 px-3 py-2 text-[10px] text-red-200">{error}</div>}
+
+        <AudioNetworkPanel engine={engineRef.current} enabled={engineReady} />
 
         <div className="grid grid-cols-[1.4fr_0.7fr_0.7fr_auto] items-end gap-2 border-b border-slate-700 bg-slate-800/70 p-2">
           <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
