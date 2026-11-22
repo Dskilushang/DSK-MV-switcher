@@ -2,10 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine, type AudioChannelSnapshot, type AudioInputDevice, type AudioMeterReading } from './audio/AudioEngine';
 import AudioNetworkPanel from './AudioNetworkPanel';
 
+export type MediaAudioRoute = {
+  connect: (channelId: number, element: HTMLMediaElement) => void;
+  disconnect: (channelId: number) => void;
+};
+
 type AudioMixerPanelProps = {
   open: boolean;
   onClose: () => void;
   onProgramStreamChange?: (stream: MediaStream | null) => void;
+  onMediaAudioRouteReady?: (route: MediaAudioRoute | null) => void;
 };
 
 const CHANNEL_COUNT = 8;
@@ -36,9 +42,10 @@ function Meter({ reading }: { reading: AudioMeterReading }) {
   );
 }
 
-export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }: AudioMixerPanelProps) {
+export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onMediaAudioRouteReady }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
+  const mediaChannelsRef = useRef<Set<number>>(new Set());
   const [engineReady, setEngineReady] = useState(false);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<Record<number, string>>({});
@@ -63,6 +70,34 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
   }, []);
+
+  useEffect(() => {
+    if (!engineReady || !engineRef.current) {
+      onMediaAudioRouteReady?.(null);
+      return;
+    }
+    const engine = engineRef.current;
+    const route: MediaAudioRoute = {
+      connect: (channelId, element) => {
+        if (streamsRef.current.has(channelId) && !mediaChannelsRef.current.has(channelId)) {
+          throw new Error(`CH ${channelId} est déjà occupé par une entrée audio. Choisissez une tranche libre.`);
+        }
+        engine.connectMediaElement(channelId, element);
+        mediaChannelsRef.current.add(channelId);
+        engine.setChannelName(channelId, 'MEDIA');
+        refreshMeters();
+      },
+      disconnect: (channelId) => {
+        if (!mediaChannelsRef.current.has(channelId)) return;
+        engine.disconnectInput(channelId);
+        mediaChannelsRef.current.delete(channelId);
+        engine.setChannelName(channelId, `CH ${channelId}`);
+        refreshMeters();
+      }
+    };
+    onMediaAudioRouteReady?.(route);
+    return () => onMediaAudioRouteReady?.(null);
+  }, [engineReady, onMediaAudioRouteReady, refreshMeters]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -138,6 +173,10 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
       setError('Démarrez d’abord le moteur audio.');
       return;
     }
+    if (mediaChannelsRef.current.has(channelId)) {
+      setError(`CH ${channelId} est réservé à MEDIA. Déconnectez MEDIA avant d’utiliser cette tranche.`);
+      return;
+    }
     if (!deviceId) {
       setError(`Sélectionnez une entrée audio pour CH ${channelId}.`);
       return;
@@ -172,7 +211,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
     }
 
     const channelIds = Array.from({ length: multiChannelCount }, (_, index) => multiChannelStart + index);
-    if (channelIds.some((channelId) => streamsRef.current.has(channelId))) {
+    if (channelIds.some((channelId) => streamsRef.current.has(channelId) || mediaChannelsRef.current.has(channelId))) {
       setError('Une ou plusieurs tranches choisies sont déjà occupées. Libérez-les avant le raccordement USB.');
       return;
     }
@@ -215,6 +254,10 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
   const disconnectChannel = (channelId: number) => {
     const engine = engineRef.current;
     if (!engine) return;
+    if (mediaChannelsRef.current.has(channelId)) {
+      setError('Cette tranche est utilisée par MEDIA. Déconnectez-la depuis le panneau MEDIA.');
+      return;
+    }
     if (multiChannelGroup?.channelIds.includes(channelId)) {
       setError('Cette tranche appartient au groupe USB. Utilisez le bouton de déconnexion du groupe.');
       return;
@@ -333,12 +376,13 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
         <div className="grid min-h-0 flex-1 grid-cols-8 gap-1 overflow-x-auto overflow-y-auto p-2">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
-            const connected = streamsRef.current.has(channelId);
+            const isMediaChannel = mediaChannelsRef.current.has(channelId);
+            const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
               <article key={channelId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
                 <div className="flex items-center justify-between gap-1">
-                  <strong className="text-xs text-white">CH {channelId}</strong>
+                  <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
                   <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
                 </div>
 
@@ -356,7 +400,9 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
                 </select>
 
                 {connected ? (
-                  belongsToUsbGroup ? (
+                  isMediaChannel ? (
+                    <div className="rounded bg-sky-900/70 px-1 py-2 text-center text-[9px] font-bold text-sky-200">MEDIA · PLAYER</div>
+                  ) : belongsToUsbGroup ? (
                     <div className="rounded bg-amber-900/70 px-1 py-2 text-center text-[9px] font-bold text-amber-200">USB · CH {multiChannelGroup?.channelIds.indexOf(channelId)! + 1}</div>
                   ) : (
                     <button onClick={() => disconnectChannel(channelId)} className="rounded bg-red-800 px-1 py-2 text-[9px] font-bold text-white">DÉCONNECTER</button>
