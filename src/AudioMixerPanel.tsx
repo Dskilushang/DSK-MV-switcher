@@ -279,7 +279,7 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
             <p className="mt-1 text-[9px] text-slate-500">Sortie PGM locale et sorties ISO pré/post-fader disponibles dans le moteur. Transport réseau vers OBS non intégré à cette étape.</p>
           </div>
           <div className="text-right text-[9px] text-slate-500">
-            <div>48 kHz selon périphérique</div>
+            <div>Fréquence native du moteur</div>
             <div>8 canaux · extensible à 32</div>
           </div>
         </footer>
