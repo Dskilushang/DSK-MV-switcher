@@ -14,17 +14,21 @@ export interface ObsConfig {
 // Callbacks pour informer l'UI
 type StatusCallback = (status: ObsStatus, message?: string) => void;
 type SceneCallback = (sceneName: string) => void;
+type StreamCallback = (active: boolean) => void;
 
 let onStatusChange: StatusCallback | null = null;
 let onSceneChange: SceneCallback | null = null;
+let onStreamStateChange: StreamCallback | null = null;
 let callbacksRegistered = false;
 
 export function registerCallbacks(
   statusCb: StatusCallback,
-  sceneCb: SceneCallback
+  sceneCb: SceneCallback,
+  streamCb?: StreamCallback
 ) {
   onStatusChange = statusCb;
   onSceneChange = sceneCb;
+  onStreamStateChange = streamCb || null;
 
   // Enregistrer les écouteurs une seule fois pour éviter les doublons.
   if (callbacksRegistered) return;
@@ -36,6 +40,10 @@ export function registerCallbacks(
 
   obs.on('CurrentProgramSceneChanged', (data) => {
     onSceneChange?.(data.sceneName);
+  });
+
+  obs.on('StreamStateChanged', (data) => {
+    onStreamStateChange?.(data.outputActive);
   });
 }
 
