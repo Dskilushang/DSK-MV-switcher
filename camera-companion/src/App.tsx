@@ -16,8 +16,6 @@ export default function App() {
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [state, setState] = useState<CameraState>('idle');
   const [message, setMessage] = useState('Configurez le Receiver puis démarrez la caméra.');
-  const [isTorchAvailable, setIsTorchAvailable] = useState(false);
-  const [torchEnabled, setTorchEnabled] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -48,8 +46,6 @@ export default function App() {
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
-    setIsTorchAvailable(false);
-    setTorchEnabled(false);
     setState('idle');
     setMessage(nextMessage);
   };
@@ -117,10 +113,6 @@ export default function App() {
         videoRef.current.srcObject = media;
         await videoRef.current.play();
       }
-
-      const videoTrack = media.getVideoTracks()[0];
-      const capabilities = videoTrack?.getCapabilities?.();
-      setIsTorchAvailable(Boolean(capabilities && 'torch' in capabilities));
 
       setState('signaling');
       setMessage(`Connexion au DSK Receiver · CAM ${cameraId}`);
@@ -208,20 +200,6 @@ export default function App() {
     }
   };
 
-  const toggleTorch = async () => {
-    const track = streamRef.current?.getVideoTracks()[0] as (MediaStreamTrack & {
-      applyConstraints?: (constraints: MediaTrackConstraints) => Promise<void>;
-    }) | undefined;
-    if (!track || !isTorchAvailable) return;
-    try {
-      const next = !torchEnabled;
-      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
-      setTorchEnabled(next);
-    } catch {
-      setMessage('Le flash n’est pas pris en charge par cette caméra.');
-    }
-  };
-
   const changeCamera = async (nextFacing: 'environment' | 'user') => {
     setFacing(nextFacing);
     if (activeRef.current) {
@@ -246,7 +224,6 @@ export default function App() {
         <video ref={videoRef} autoPlay muted playsInline />
         {!isActive && <div className="preview-placeholder"><b>DSK CAMERA</b><span>Aperçu vidéo en attente</span></div>}
         <div className="preview-tag">CAM {cameraId}</div>
-        {isTorchAvailable && <button className="torch-button" onClick={toggleTorch}>{torchEnabled ? 'FLASH ON' : 'FLASH OFF'}</button>}
       </section>
 
       <section className="controls">
