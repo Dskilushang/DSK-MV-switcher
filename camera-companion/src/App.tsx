@@ -5,7 +5,7 @@ type CameraState = 'idle' | 'requesting' | 'signaling' | 'waiting' | 'connected'
 const CAMERA_IDS = [2, 3, 4, 5, 6, 7, 8];
 
 function cleanHost(value: string): string {
-  return value.trim().replace(/^https?:\\/\\//i, '').replace(/\\/+$/, '');
+  return value.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 }
 
 export default function App() {
