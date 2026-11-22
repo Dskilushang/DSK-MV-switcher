@@ -173,6 +173,10 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       setError('Démarrez d’abord le moteur audio.');
       return;
     }
+    if (mediaChannelsRef.current.has(channelId)) {
+      setError(`CH ${channelId} est réservé à MEDIA. Déconnectez MEDIA avant d’utiliser cette tranche.`);
+      return;
+    }
     if (!deviceId) {
       setError(`Sélectionnez une entrée audio pour CH ${channelId}.`);
       return;
@@ -207,7 +211,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     }
 
     const channelIds = Array.from({ length: multiChannelCount }, (_, index) => multiChannelStart + index);
-    if (channelIds.some((channelId) => streamsRef.current.has(channelId))) {
+    if (channelIds.some((channelId) => streamsRef.current.has(channelId) || mediaChannelsRef.current.has(channelId))) {
       setError('Une ou plusieurs tranches choisies sont déjà occupées. Libérez-les avant le raccordement USB.');
       return;
     }
@@ -250,6 +254,10 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const disconnectChannel = (channelId: number) => {
     const engine = engineRef.current;
     if (!engine) return;
+    if (mediaChannelsRef.current.has(channelId)) {
+      setError('Cette tranche est utilisée par MEDIA. Déconnectez-la depuis le panneau MEDIA.');
+      return;
+    }
     if (multiChannelGroup?.channelIds.includes(channelId)) {
       setError('Cette tranche appartient au groupe USB. Utilisez le bouton de déconnexion du groupe.');
       return;
@@ -368,7 +376,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
         <div className="grid min-h-0 flex-1 grid-cols-8 gap-1 overflow-x-auto overflow-y-auto p-2">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
-            const connected = streamsRef.current.has(channelId);
+            const isMediaChannel = mediaChannelsRef.current.has(channelId);\n            const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
               <article key={channelId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
@@ -391,7 +399,9 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                 </select>
 
                 {connected ? (
-                  belongsToUsbGroup ? (
+                  isMediaChannel ? (
+                    <div className="rounded bg-sky-900/70 px-1 py-2 text-center text-[9px] font-bold text-sky-200">MEDIA · PLAYER</div>
+                  ) : belongsToUsbGroup ? (
                     <div className="rounded bg-amber-900/70 px-1 py-2 text-center text-[9px] font-bold text-amber-200">USB · CH {multiChannelGroup?.channelIds.indexOf(channelId)! + 1}</div>
                   ) : (
                     <button onClick={() => disconnectChannel(channelId)} className="rounded bg-red-800 px-1 py-2 text-[9px] font-bold text-white">DÉCONNECTER</button>
