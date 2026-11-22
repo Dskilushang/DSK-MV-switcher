@@ -3,6 +3,7 @@ import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
 import AudioMixerPanel from './AudioMixerPanel';
+import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
 import { connectObs, disconnectObs, getSceneList, registerCallbacks, setProgramScene, type ObsStatus } from './services/obsService';
 
 export default function App() {
@@ -42,8 +43,14 @@ export default function App() {
   const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'active' | 'error'>('idle');
   const [cameraError, setCameraError] = useState('');
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
+  const [remoteCameraStreams, setRemoteCameraStreams] = useState<Record<number, MediaStream | null>>({});
   const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
+  const cameraReceiverRef = useRef<CameraLanReceiver | null>(null);
+  const [cameraReceiverHost, setCameraReceiverHost] = useState('');
+  const [cameraReceiverPort, setCameraReceiverPort] = useState('8765');
+  const [cameraReceiverToken, setCameraReceiverToken] = useState('');
+  const [cameraReceiverStatuses, setCameraReceiverStatuses] = useState<Record<number, CameraReceiverStatus['state']>>({});
+  const [cameraReceiverMessage, setCameraReceiverMessage] = useState('Non connecté');
 
 
   // --- LOGO & RÉGLAGES ---
@@ -172,6 +179,48 @@ export default function App() {
     };
   }, [cameraStream]);
 
+  // --- RÉCEPTION DES CAMÉRAS DISTANTES ---
+  const connectRemoteCameras = () => {
+    try {
+      void cameraReceiverRef.current?.disconnect();
+      const receiver = new CameraLanReceiver(
+        (status) => {
+          setCameraReceiverStatuses((current) => ({ ...current, [status.cameraId]: status.state }));
+          if (status.state === 'error') setCameraReceiverMessage(`CAM ${status.cameraId} : ${status.message || 'Erreur vidéo.'}`);
+        },
+        (cameraId, stream) => setRemoteCameraStreams((current) => ({ ...current, [cameraId]: stream }))
+      );
+      receiver.connect(cameraReceiverHost, Number(cameraReceiverPort), cameraReceiverToken);
+      cameraReceiverRef.current = receiver;
+      setCameraReceiverStatuses({});
+      setCameraReceiverMessage('Recherche des téléphones DSK Camera sur le réseau local…');
+    } catch (error) {
+      setCameraReceiverMessage(error instanceof Error ? error.message : 'Connexion vidéo impossible.');
+    }
+  };
+
+  const disconnectRemoteCameras = () => {
+    void cameraReceiverRef.current?.disconnect();
+    cameraReceiverRef.current = null;
+    setRemoteCameraStreams({});
+    setCameraReceiverStatuses({});
+    setCameraReceiverMessage('Réception vidéo arrêtée.');
+  };
+
+  useEffect(() => {
+    return () => { void cameraReceiverRef.current?.disconnect(); };
+  }, []);
+
+  useEffect(() => {
+    Object.entries(remoteCameraStreams).forEach(([cameraId, stream]) => {
+      const video = remoteVideoRefs.current[Number(cameraId)];
+      if (video && video.srcObject !== stream) {
+        video.srcObject = stream;
+        if (stream) void video.play().catch(() => undefined);
+      }
+    });
+  }, [remoteCameraStreams]);
+
   // --- CHROMA KEY ---
   const applyChromaKey = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -229,7 +278,7 @@ export default function App() {
           } else {
              ctx.drawImage(localVideoRef.current, 0, 0, canvas.width, canvas.height);
           }
-        } else if (remoteCameras[ch] && remoteVideoRefs.current[ch]) {
+        } else if (remoteCameraStreams[ch] && remoteVideoRefs.current[ch] && remoteVideoRefs.current[ch]!.readyState >= 2) {
           ctx.drawImage(remoteVideoRefs.current[ch]!, 0, 0, canvas.width, canvas.height);
         }
         ctx.globalAlpha = 1.0;
@@ -295,7 +344,7 @@ export default function App() {
     };
     draw();
     return () => cancelAnimationFrame(frameId);
-  }, [programChannel, previewChannel, remoteCameras, programZoom, isLogoActive, customLogo, logoPos, tBarProgress, isFrozen, isChromaActive, dskLayers]);
+  }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, tBarProgress, isFrozen, isChromaActive, dskLayers]);
 
   // --- PREVIEW DIRECT ---
   useEffect(() => {
@@ -430,8 +479,8 @@ export default function App() {
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
                     {cameraStream ? <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /> : <div className="z-20 flex flex-col items-center gap-1 px-1"><button onClick={(event) => { event.stopPropagation(); void startCamera(); }} disabled={cameraStatus === 'requesting'} className="bg-red-600 disabled:bg-slate-600 text-white px-2 py-1 rounded text-[10px] pointer-events-auto">{cameraStatus === 'requesting' ? 'Activation…' : 'Activer'}</button>{cameraError && <span role="alert" className="max-w-full text-center text-[8px] leading-tight text-red-300">{cameraError}</span>}</div>}
                   </div>
-                ) : remoteCameras[channel] ? (
-                  <video ref={(el) => { remoteVideoRefs.current[channel] = el; }} src={remoteCameras[channel]} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                ) : remoteCameraStreams[channel] ? (
+                  <video ref={(el) => { remoteVideoRefs.current[channel] = el; }} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
                 )}
@@ -594,13 +643,31 @@ export default function App() {
               )}
             </div>
 
-            <div className="space-y-2 mb-4">
-              {[2, 3, 4, 5, 6, 7, 8].map((cam) => (
-                <div key={cam} className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-300 w-10">CAM {cam}</span>
-                  <input type="text" placeholder="http://..." value={remoteCameras[cam] || ''} onChange={(e) => setRemoteCameras({...remoteCameras, [cam]: e.target.value})} className="flex-1 bg-slate-900 text-white text-xs px-2 py-1 rounded border border-slate-600 outline-none" />
-                </div>
-              ))}
+            <div className="mb-4 bg-slate-900 p-3 rounded border border-slate-700 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold text-sky-300">DSK VIDEO · CAM 2 À CAM 8</p>
+                <span className="text-[9px] text-slate-400">{Object.values(cameraReceiverStatuses).filter((status) => status === 'connected').length}/7 reçues</span>
+              </div>
+              <label className="block text-[10px] text-slate-400">IP DU PC DSK RECEIVER</label>
+              <input type="text" value={cameraReceiverHost} onChange={(e) => setCameraReceiverHost(e.target.value)} placeholder="192.168.1.100" className="w-full bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
+              <label className="block text-[10px] text-slate-400">PORT VIDÉO</label>
+              <input type="number" min="1" max="65535" value={cameraReceiverPort} onChange={(e) => setCameraReceiverPort(e.target.value)} className="w-full bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
+              <label className="block text-[10px] text-slate-400">CODE D’ASSOCIATION</label>
+              <input type="password" autoComplete="off" value={cameraReceiverToken} onChange={(e) => setCameraReceiverToken(e.target.value)} placeholder="Code affiché sur le PC" className="w-full bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
+              <div className="flex gap-2">
+                <button onClick={connectRemoteCameras} disabled={!cameraReceiverHost.trim() || cameraReceiverToken.trim().length < 16} className="flex-1 bg-sky-700 disabled:opacity-40 text-white py-2 rounded text-[10px] font-bold">CONNECTER CAM 2–8</button>
+                <button onClick={disconnectRemoteCameras} className="flex-1 bg-slate-700 text-white py-2 rounded text-[10px] font-bold">DÉCONNECTER</button>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {[2,3,4,5,6,7,8].map((cam) => (
+                  <div key={cam} className="rounded bg-slate-800 px-2 py-1 text-[9px] flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${cameraReceiverStatuses[cam] === 'connected' ? 'bg-emerald-400' : cameraReceiverStatuses[cam] === 'error' ? 'bg-red-400' : 'bg-slate-600'}`} />
+                    <span>CAM {cam}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-slate-400">{cameraReceiverMessage}</p>
+              <p className="text-[9px] text-amber-300">Sur chaque téléphone : ouvrez http://IP_DU_PC:8765/camera, choisissez CAM 2 à CAM 8 et saisissez le code. L’accès caméra du navigateur exige HTTPS ou l’application native DSK Camera ; une simple page HTTP sur IP locale peut être bloquée par Android.</p>
             </div>
             
             <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded font-bold mt-2">
