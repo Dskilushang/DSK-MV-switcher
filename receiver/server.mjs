@@ -1,6 +1,4 @@
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 
 const HOST = process.env.DSK_RECEIVER_HOST || '0.0.0.0';
