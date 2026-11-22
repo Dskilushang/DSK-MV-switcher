@@ -5,6 +5,7 @@ import AudioNetworkPanel from './AudioNetworkPanel';
 type AudioMixerPanelProps = {
   open: boolean;
   onClose: () => void;
+  onProgramStreamChange?: (stream: MediaStream | null) => void;
 };
 
 const CHANNEL_COUNT = 8;
@@ -35,7 +36,7 @@ function Meter({ reading }: { reading: AudioMeterReading }) {
   );
 }
 
-export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps) {
+export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
   const [engineReady, setEngineReady] = useState(false);
@@ -78,6 +79,7 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
       streamsRef.current.clear();
       const engine = engineRef.current;
       engineRef.current = null;
+      onProgramStreamChange?.(null);
       if (engine) void engine.dispose();
     };
   }, []);
@@ -115,12 +117,14 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
       engine = new AudioEngine({ channelCount: CHANNEL_COUNT });
       await engine.resume();
       engineRef.current = engine;
+      onProgramStreamChange?.(engine.getProgramStream());
       setChannels(engine.getAllChannelSnapshots());
       setEngineReady(true);
       await refreshInputDevices();
     } catch (cause) {
       if (engine) await engine.dispose();
       engineRef.current = null;
+      onProgramStreamChange?.(null);
       setEngineReady(false);
       setStatus('Moteur audio indisponible');
       setError(cause instanceof Error ? cause.message : 'Impossible de démarrer le moteur audio.');
