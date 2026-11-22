@@ -373,7 +373,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
             return (
               <article key={channelId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
                 <div className="flex items-center justify-between gap-1">
-                  <strong className="text-xs text-white">CH {channelId}</strong>
+                  <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
                   <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
                 </div>
 
