@@ -247,10 +247,8 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
     refreshMeters();
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-2">
+    <div className={open ? 'fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-2' : 'hidden'}>
       <section className="flex max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
         <header className="flex items-center justify-between border-b border-slate-700 bg-slate-950 px-3 py-2">
           <div>
