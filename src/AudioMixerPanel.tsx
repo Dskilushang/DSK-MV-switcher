@@ -2,10 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine, type AudioChannelSnapshot, type AudioInputDevice, type AudioMeterReading } from './audio/AudioEngine';
 import AudioNetworkPanel from './AudioNetworkPanel';
 
+export type MediaAudioRoute = {
+  connect: (channelId: number, element: HTMLMediaElement) => void;
+  disconnect: (channelId: number) => void;
+};
+
 type AudioMixerPanelProps = {
   open: boolean;
   onClose: () => void;
   onProgramStreamChange?: (stream: MediaStream | null) => void;
+  onMediaAudioRouteReady?: (route: MediaAudioRoute | null) => void;
 };
 
 const CHANNEL_COUNT = 8;
@@ -36,9 +42,10 @@ function Meter({ reading }: { reading: AudioMeterReading }) {
   );
 }
 
-export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }: AudioMixerPanelProps) {
+export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onMediaAudioRouteReady }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
+  const mediaChannelsRef = useRef<Set<number>>(new Set());
   const [engineReady, setEngineReady] = useState(false);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<Record<number, string>>({});
@@ -63,6 +70,34 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange }
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
   }, []);
+
+  useEffect(() => {
+    if (!engineReady || !engineRef.current) {
+      onMediaAudioRouteReady?.(null);
+      return;
+    }
+    const engine = engineRef.current;
+    const route: MediaAudioRoute = {
+      connect: (channelId, element) => {
+        if (streamsRef.current.has(channelId) && !mediaChannelsRef.current.has(channelId)) {
+          throw new Error(`CH ${channelId} est déjà occupé par une entrée audio. Choisissez une tranche libre.`);
+        }
+        engine.connectMediaElement(channelId, element);
+        mediaChannelsRef.current.add(channelId);
+        engine.setChannelName(channelId, 'MEDIA');
+        refreshMeters();
+      },
+      disconnect: (channelId) => {
+        if (!mediaChannelsRef.current.has(channelId)) return;
+        engine.disconnectInput(channelId);
+        mediaChannelsRef.current.delete(channelId);
+        engine.setChannelName(channelId, `CH ${channelId}`);
+        refreshMeters();
+      }
+    };
+    onMediaAudioRouteReady?.(route);
+    return () => onMediaAudioRouteReady?.(null);
+  }, [engineReady, onMediaAudioRouteReady, refreshMeters]);
 
   useEffect(() => {
     if (!engineReady) return;
