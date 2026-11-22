@@ -47,6 +47,7 @@ export class AudioEngine {
   private readonly context: AudioContext;
   private readonly ownsContext: boolean;
   private readonly channels = new Map<number, ChannelGraph>();
+  private readonly mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
   private readonly masterGain: GainNode;
   private readonly masterAnalyser: AnalyserNode;
   private readonly programDestination: MediaStreamAudioDestinationNode;
@@ -137,6 +138,19 @@ export class AudioEngine {
         : { channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       video: false
     });
+  }
+
+  connectMediaElement(channelId: number, element: HTMLMediaElement): void {
+    this.assertActive();
+    const channel = this.getChannel(channelId);
+    let source = this.mediaElementSources.get(element);
+    if (!source) {
+      source = this.context.createMediaElementSource(element);
+      this.mediaElementSources.set(element, source);
+    }
+    this.disconnectInput(channelId);
+    channel.source = { node: source, outputIndex: 0 };
+    source.connect(channel.inputGain);
   }
 
   connectInput(channelId: number, stream: MediaStream): void {
