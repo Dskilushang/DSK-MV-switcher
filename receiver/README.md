@@ -20,7 +20,7 @@ npm install
 npm start
 ```
 
-The receiver listens on port 8765 by default. Set `DSK_RECEIVER_PORT` to change it. It binds to all network interfaces; restrict access to a trusted LAN and allow the chosen TCP port in the computer firewall.
+The receiver listens on port 8765 by default. Set `DSK_RECEIVER_PORT` to change it. It binds to all network interfaces; restrict access to a trusted LAN and allow the chosen TCP signaling port in the computer firewall. WebRTC media also uses dynamically negotiated UDP ports; allow Node.js/OBS WebRTC traffic on the Windows Private network profile.
 
 Open `http://127.0.0.1:8765/health` on the PC. The response should report `"status":"ready"`.
 
