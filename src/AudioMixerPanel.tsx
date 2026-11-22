@@ -40,6 +40,10 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
   const [engineReady, setEngineReady] = useState(false);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<Record<number, string>>({});
+  const [multiChannelDevice, setMultiChannelDevice] = useState('');
+  const [multiChannelStart, setMultiChannelStart] = useState(1);
+  const [multiChannelCount, setMultiChannelCount] = useState(8);
+  const [multiChannelGroup, setMultiChannelGroup] = useState<{ stream: MediaStream; channelIds: number[] } | null>(null);
   const [channels, setChannels] = useState<AudioChannelSnapshot[]>([]);
   const [masterMeter, setMasterMeter] = useState<AudioMeterReading>({ rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY });
   const [masterGain, setMasterGain] = useState(1);
@@ -151,9 +155,65 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
     }
   };
 
+  const connectMultichannelDevice = async () => {
+    const engine = engineRef.current;
+    if (!engine) {
+      setError('Démarrez d’abord le moteur audio.');
+      return;
+    }
+    if (!multiChannelDevice) {
+      setError('Sélectionnez une interface USB multicanale.');
+      return;
+    }
+
+    const channelIds = Array.from({ length: multiChannelCount }, (_, index) => multiChannelStart + index);
+    if (channelIds.some((channelId) => streamsRef.current.has(channelId))) {
+      setError('Une ou plusieurs tranches choisies sont déjà occupées. Libérez-les avant le raccordement USB.');
+      return;
+    }
+
+    setBusyChannel(multiChannelStart);
+    setError('');
+    let stream: MediaStream | null = null;
+    try {
+      stream = await engine.requestInputStream(multiChannelDevice, multiChannelCount);
+      const actualCount = engine.connectMultichannelInput(multiChannelStart, stream, multiChannelCount);
+      const connectedIds = channelIds.slice(0, actualCount);
+      connectedIds.forEach((channelId) => streamsRef.current.set(channelId, stream!));
+      setMultiChannelGroup({ stream, channelIds: connectedIds });
+      refreshMeters();
+      setStatus(`USB multicanal connecté · CH ${multiChannelStart} à CH ${multiChannelStart + actualCount - 1} · ${actualCount} canal(aux)`);
+      if (actualCount < multiChannelCount) {
+        setError(`Le périphérique n’a exposé que ${actualCount} canal(aux) sur les ${multiChannelCount} demandés. Vérifiez son pilote et ses paramètres Android.`);
+      }
+    } catch (cause) {
+      stream?.getTracks().forEach((track) => track.stop());
+      setError(cause instanceof Error ? cause.message : 'Connexion USB multicanale impossible.');
+    } finally {
+      setBusyChannel(null);
+    }
+  };
+
+  const disconnectMultichannelDevice = () => {
+    const engine = engineRef.current;
+    if (!engine || !multiChannelGroup) return;
+    multiChannelGroup.channelIds.forEach((channelId) => {
+      engine.disconnectInput(channelId);
+      streamsRef.current.delete(channelId);
+    });
+    multiChannelGroup.stream.getTracks().forEach((track) => track.stop());
+    setMultiChannelGroup(null);
+    refreshMeters();
+    setStatus('Interface USB multicanale déconnectée');
+  };
+
   const disconnectChannel = (channelId: number) => {
     const engine = engineRef.current;
     if (!engine) return;
+    if (multiChannelGroup?.channelIds.includes(channelId)) {
+      setError('Cette tranche appartient au groupe USB. Utilisez le bouton de déconnexion du groupe.');
+      return;
+    }
     try {
       engine.disconnectInput(channelId);
       streamsRef.current.get(channelId)?.getTracks().forEach((track) => track.stop());
@@ -212,10 +272,64 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
 
         {error && <div role="alert" className="border-b border-red-900 bg-red-950/70 px-3 py-2 text-[10px] text-red-200">{error}</div>}
 
+        <div className="grid grid-cols-[1.4fr_0.7fr_0.7fr_auto] items-end gap-2 border-b border-slate-700 bg-slate-800/70 p-2">
+          <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
+            <span>INTERFACE USB MULTICANALE</span>
+            <select
+              aria-label="Interface USB multicanale"
+              value={multiChannelDevice}
+              onChange={(event) => setMultiChannelDevice(event.target.value)}
+              disabled={!engineReady || !!multiChannelGroup}
+              className="h-9 w-full min-w-0 rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
+            >
+              <option value="">Choisir une interface…</option>
+              {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.label}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-[9px] text-slate-400">
+            <span>PREMIÈRE TRANCHE</span>
+            <select
+              value={multiChannelStart}
+              onChange={(event) => {
+                const nextStart = Number(event.target.value);
+                setMultiChannelStart(nextStart);
+                setMultiChannelCount((current) => Math.min(current, CHANNEL_COUNT - nextStart + 1));
+              }}
+              disabled={!engineReady || !!multiChannelGroup}
+              className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
+            >
+              {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((value) => <option key={value} value={value}>CH {value}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-[9px] text-slate-400">
+            <span>NOMBRE DE CANAUX</span>
+            <select
+              value={multiChannelCount}
+              onChange={(event) => setMultiChannelCount(Number(event.target.value))}
+              disabled={!engineReady || !!multiChannelGroup}
+              className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
+            >
+              {Array.from({ length: CHANNEL_COUNT - multiChannelStart + 1 }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{value} {value === 1 ? 'canal' : 'canaux'}</option>)}
+            </select>
+          </label>
+          {multiChannelGroup ? (
+            <button onClick={disconnectMultichannelDevice} className="h-9 rounded bg-red-800 px-3 text-[9px] font-bold text-white">DÉCONNECTER USB</button>
+          ) : (
+            <button
+              onClick={() => void connectMultichannelDevice()}
+              disabled={!engineReady || !multiChannelDevice || busyChannel !== null}
+              className="h-9 rounded bg-amber-700 px-3 text-[9px] font-bold text-white disabled:opacity-40"
+            >
+              {busyChannel === multiChannelStart ? 'CONNEXION…' : 'CONNECTER USB'}
+            </button>
+          )}
+        </div>
+
         <div className="grid min-h-0 flex-1 grid-cols-8 gap-1 overflow-x-auto overflow-y-auto p-2">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
             const connected = streamsRef.current.has(channelId);
+            const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
               <article key={channelId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
                 <div className="flex items-center justify-between gap-1">
@@ -237,7 +351,11 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
                 </select>
 
                 {connected ? (
-                  <button onClick={() => disconnectChannel(channelId)} className="rounded bg-red-800 px-1 py-2 text-[9px] font-bold text-white">DÉCONNECTER</button>
+                  belongsToUsbGroup ? (
+                    <div className="rounded bg-amber-900/70 px-1 py-2 text-center text-[9px] font-bold text-amber-200">USB · CH {multiChannelGroup?.channelIds.indexOf(channelId)! + 1}</div>
+                  ) : (
+                    <button onClick={() => disconnectChannel(channelId)} className="rounded bg-red-800 px-1 py-2 text-[9px] font-bold text-white">DÉCONNECTER</button>
+                  )
                 ) : (
                   <button
                     onClick={() => void connectChannel(channelId)}
