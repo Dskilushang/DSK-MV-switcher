@@ -3,6 +3,7 @@ import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
 import AudioMixerPanel, { type MediaAudioRoute } from './AudioMixerPanel';
+import SystemPanel from './SystemPanel';
 import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
 import { connectObs, disconnectObs, getSceneList, getObsStreamActive, registerCallbacks, setProgramScene, startObsStream, stopObsStream, type ObsStatus } from './services/obsService';
 
@@ -148,6 +149,7 @@ export default function App() {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSystemPanelOpen, setIsSystemPanelOpen] = useState(false);
   const [obsHost, setObsHost] = useState('192.168.1.100');
   const [obsPort, setObsPort] = useState('4455');
   const [obsPassword, setObsPassword] = useState('');
@@ -726,6 +728,18 @@ export default function App() {
     }
   };
 
+  const applySystemProfile = (profile: { obsHost: string; obsPort: string; cameraHost: string; cameraPort: string }) => {
+    setObsHost(profile.obsHost);
+    setObsPort(profile.obsPort);
+    setCameraReceiverHost(profile.cameraHost);
+    setCameraReceiverPort(profile.cameraPort);
+    // Les secrets ne sont jamais enregistrés dans les profils : ils doivent être ressaisis pour le nouvel hôte.
+    setObsPassword('');
+    setCameraReceiverToken('');
+    setObsMessage('Profil chargé. Vérifiez les identifiants puis reconnectez OBS.');
+    setCameraReceiverMessage('Profil chargé. Vérifiez le code d’association puis reconnectez les caméras.');
+  };
+
   // LIVE pilote le moteur de diffusion OBS lorsqu’il est connecté.
   const toggleLive = async () => {
     if (obsStatus !== 'connected') {
@@ -773,7 +787,8 @@ export default function App() {
           </button>
           {(recordingMessage || liveMessage) && <span className="max-w-[180px] truncate text-[8px] text-slate-400" title={recordingMessage || liveMessage}>{recordingMessage || liveMessage}</span>}
           <button onClick={() => setIsProgramViewOpen(true)} className="p-1 text-red-500"><MonitorPlay size={18} /></button>
-          <button onClick={() => setIsSettingsOpen(true)} className="p-1 text-slate-400"><Settings size={18} /></button>
+          <button onClick={() => setIsSystemPanelOpen(true)} className="rounded bg-sky-800 px-2 py-1 text-[9px] font-black text-white">SYSTEM</button>
+          <button onClick={() => setIsSettingsOpen(true)} className="p-1 text-slate-400" title="Connexions OBS et vidéo"><Settings size={18} /></button>
         </div>
       </header>
 
@@ -916,6 +931,20 @@ export default function App() {
       </footer>
 
       {/* MODALES */}
+      <SystemPanel
+        open={isSystemPanelOpen}
+        onClose={() => setIsSystemPanelOpen(false)}
+        obsHost={obsHost}
+        obsPort={obsPort}
+        cameraHost={cameraReceiverHost}
+        cameraPort={cameraReceiverPort}
+        obsStatus={obsStatus}
+        connectedCameras={Object.values(cameraReceiverStatuses).filter((status) => status === 'connected').length}
+        isRecording={isRecording}
+        isLive={isLive}
+        onApplyProfile={applySystemProfile}
+      />
+
       {isSettingsOpen && (
         <div 
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"
