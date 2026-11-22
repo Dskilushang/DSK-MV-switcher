@@ -15,7 +15,14 @@ export default function App() {
   
   // --- EFFETS ---
   const [isChromaActive, setIsChromaActive] = useState(false);
+  const [isChromaPanelOpen, setIsChromaPanelOpen] = useState(false);
+  const [chromaKeyColor, setChromaKeyColor] = useState<'green' | 'blue'>('green');
+  const [chromaThreshold, setChromaThreshold] = useState(35);
   const [isPipActive, setIsPipActive] = useState(false);
+  const [isPipPanelOpen, setIsPipPanelOpen] = useState(false);
+  const [pipSourceChannel, setPipSourceChannel] = useState(2);
+  const [pipScale, setPipScale] = useState(0.28);
+  const [pipPosition, setPipPosition] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('bottom-right');
   const [isLogoActive, setIsLogoActive] = useState(false); // Contrôle l'affichage du logo
   const [isDskPanelOpen, setIsDskPanelOpen] = useState(false);
   const [isAudioPanelOpen, setIsAudioPanelOpen] = useState(false);
@@ -226,32 +233,63 @@ export default function App() {
     });
   }, [remoteCameraStreams]);
 
-  // --- CHROMA KEY ---
-  const applyChromaKey = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-    const draw = () => {
-      if (video.paused || video.ended) return;
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      for (let i = 0; i < frame.data.length; i += 4) {
-        const r = frame.data[i], g = frame.data[i+1], b = frame.data[i+2];
-        if (g > 100 && g > r * 1.4 && g > b * 1.4) frame.data[i+3] = 0;
-      }
-      ctx.putImageData(frame, 0, 0);
-      chromaAnimationRef.current = requestAnimationFrame(draw);
-    };
-    draw();
-  };
-
+  // --- CHROMA KEY · SOURCE PGM ---
   useEffect(() => {
-    if (isChromaActive && localVideoRef.current && chromaCanvasRef.current) {
-      applyChromaKey(localVideoRef.current, chromaCanvasRef.current);
-    } else {
-      if (chromaAnimationRef.current) cancelAnimationFrame(chromaAnimationRef.current);
+    if (chromaAnimationRef.current !== null) {
+      cancelAnimationFrame(chromaAnimationRef.current);
+      chromaAnimationRef.current = null;
     }
-  }, [isChromaActive]);
+    if (!isChromaActive || !chromaCanvasRef.current) return;
+
+    const video = programChannel === 1
+      ? localVideoRef.current
+      : remoteVideoRefs.current[programChannel];
+    const canvas = chromaCanvasRef.current;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!video || !ctx) return;
+
+    let cancelled = false;
+    let lastProcessedAt = 0;
+    const processFrame = (timestamp: number) => {
+      if (cancelled) return;
+      if (timestamp - lastProcessedAt >= 33 && video.readyState >= 2 && video.videoWidth > 0) {
+        lastProcessedAt = timestamp;
+        const scale = Math.min(1, 640 / video.videoWidth);
+        const width = Math.max(1, Math.round(video.videoWidth * scale));
+        const height = Math.max(1, Math.round(video.videoHeight * scale));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        ctx.drawImage(video, 0, 0, width, height);
+        const frame = ctx.getImageData(0, 0, width, height);
+        for (let i = 0; i < frame.data.length; i += 4) {
+          const red = frame.data[i];
+          const green = frame.data[i + 1];
+          const blue = frame.data[i + 2];
+          const dominance = chromaKeyColor === 'green'
+            ? green - Math.max(red, blue)
+            : blue - Math.max(red, green);
+          const keyChannel = chromaKeyColor === 'green' ? green : blue;
+          if (keyChannel > 70 && dominance > chromaThreshold) {
+            const transparency = Math.min(1, (dominance - chromaThreshold) / 24);
+            frame.data[i + 3] = Math.round(frame.data[i + 3] * (1 - transparency));
+          }
+        }
+        ctx.putImageData(frame, 0, 0);
+      }
+      chromaAnimationRef.current = requestAnimationFrame(processFrame);
+    };
+
+    chromaAnimationRef.current = requestAnimationFrame(processFrame);
+    return () => {
+      cancelled = true;
+      if (chromaAnimationRef.current !== null) {
+        cancelAnimationFrame(chromaAnimationRef.current);
+        chromaAnimationRef.current = null;
+      }
+    };
+  }, [isChromaActive, programChannel, cameraStream, remoteCameraStreams, chromaKeyColor, chromaThreshold]);
 
   // --- MOTEUR DU CANVAS (GÈRE LE FREEZE, LE FONDU ET LE LOGO) ---
   useEffect(() => {
@@ -277,14 +315,16 @@ export default function App() {
 
       const drawSource = (ch: number, opacity: number) => {
         ctx.globalAlpha = opacity;
-        if (ch === 1 && localVideoRef.current) {
-          if (isChromaActive && chromaCanvasRef.current) {
-             ctx.drawImage(chromaCanvasRef.current, 0, 0, canvas.width, canvas.height);
-          } else {
-             ctx.drawImage(localVideoRef.current, 0, 0, canvas.width, canvas.height);
-          }
-        } else if (remoteCameraStreams[ch] && remoteVideoRefs.current[ch] && remoteVideoRefs.current[ch]!.readyState >= 2) {
-          ctx.drawImage(remoteVideoRefs.current[ch]!, 0, 0, canvas.width, canvas.height);
+        const sourceVideo = ch === 1 ? localVideoRef.current : remoteVideoRefs.current[ch];
+        if (
+          isChromaActive &&
+          ch === programChannel &&
+          chromaCanvasRef.current &&
+          chromaCanvasRef.current.width > 0
+        ) {
+          ctx.drawImage(chromaCanvasRef.current, 0, 0, canvas.width, canvas.height);
+        } else if (sourceVideo && sourceVideo.readyState >= 2) {
+          ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
         }
         ctx.globalAlpha = 1.0;
       };
@@ -296,6 +336,37 @@ export default function App() {
         drawSource(programChannel, 1);
       }
       ctx.restore();
+
+      // PIP : seconde source vidéo composée dans le programme.
+      if (isPipActive && pipSourceChannel !== programChannel) {
+        const pipVideo = pipSourceChannel === 1
+          ? localVideoRef.current
+          : remoteVideoRefs.current[pipSourceChannel];
+        if (pipVideo && pipVideo.readyState >= 2 && pipVideo.videoWidth > 0) {
+          const aspect = pipVideo.videoWidth / pipVideo.videoHeight;
+          let pipWidth = canvas.width * pipScale;
+          let pipHeight = pipWidth / aspect;
+          const maxHeight = canvas.height * 0.42;
+          if (pipHeight > maxHeight) {
+            pipHeight = maxHeight;
+            pipWidth = pipHeight * aspect;
+          }
+          const margin = Math.round(canvas.width * 0.025);
+          const x = pipPosition.endsWith('right') ? canvas.width - pipWidth - margin : margin;
+          const y = pipPosition.startsWith('bottom') ? canvas.height - pipHeight - margin : margin;
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.65)';
+          ctx.shadowBlur = 18;
+          ctx.fillStyle = '#020617';
+          ctx.fillRect(x - 5, y - 5, pipWidth + 10, pipHeight + 10);
+          ctx.shadowBlur = 0;
+          ctx.drawImage(pipVideo, x, y, pipWidth, pipHeight);
+          ctx.strokeStyle = '#f8fafc';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x, y, pipWidth, pipHeight);
+          ctx.restore();
+        }
+      }
 
       if (isLogoActive && customLogo) {
         const logoImg = new Image();
@@ -349,7 +420,7 @@ export default function App() {
     };
     draw();
     return () => cancelAnimationFrame(frameId);
-  }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, dskLayers]);
+  }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
 
   // --- MONITEURS PGM / PVW ---
   useEffect(() => {
@@ -524,8 +595,8 @@ export default function App() {
         
         {/* GAUCHE : Effets */}
         <div className="w-16 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-2 gap-2 shrink-0">
-          <button onClick={() => setIsChromaActive(!isChromaActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isChromaActive ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>CHROMA</button>
-          <button onClick={() => setIsPipActive(!isPipActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isPipActive ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-400'}`}>PIP</button>
+          <button onClick={() => setIsChromaPanelOpen(true)} className={`w-12 h-10 rounded text-[9px] font-bold ${isChromaActive ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>CHROMA</button>
+          <button onClick={() => setIsPipPanelOpen(true)} className={`w-12 h-10 rounded text-[9px] font-bold ${isPipActive ? 'bg-orange-600 text-white' : 'bg-slate-800 text-slate-400'}`}>PIP</button>
           
           {/* Ancien raccourci logo conservé pour compatibilité */}
           <button onClick={() => setIsLogoActive(!isLogoActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isLogoActive ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>LOGO</button>
@@ -757,6 +828,62 @@ export default function App() {
         </div>
       )}
 
+      {isChromaPanelOpen && (
+        <div className="fixed inset-0 z-[110] bg-black/80 flex items-center justify-center p-4">
+          <section className="w-full max-w-md bg-slate-900 border border-emerald-700 rounded-xl p-4 space-y-4 shadow-2xl">
+            <header className="flex items-center justify-between">
+              <h2 className="text-sm font-black text-emerald-400 tracking-widest">CHROMA KEY</h2>
+              <button onClick={() => setIsChromaPanelOpen(false)} className="min-w-10 min-h-10 rounded bg-slate-800 text-white">✕</button>
+            </header>
+            <p className="text-xs text-slate-400">Détourage appliqué à la source actuellement en PGM : CAM {programChannel}. Utilisez un fond vert ou bleu uniforme et un éclairage régulier.</p>
+            <label className="block text-[10px] font-bold text-slate-400">COULEUR À SUPPRIMER</label>
+            <select value={chromaKeyColor} onChange={(event) => setChromaKeyColor(event.target.value as 'green' | 'blue')} className="w-full bg-slate-800 text-white p-3 rounded border border-slate-700 text-sm">
+              <option value="green">Vert (Green Screen)</option>
+              <option value="blue">Bleu (Blue Screen)</option>
+            </select>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-slate-300"><span>Seuil de tolérance</span><strong>{chromaThreshold}</strong></div>
+              <input type="range" min="10" max="100" step="1" value={chromaThreshold} onChange={(event) => setChromaThreshold(Number(event.target.value))} className="w-full" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setIsChromaActive(!isChromaActive)} className={`flex-1 py-3 rounded font-black text-xs ${isChromaActive ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-slate-200'}`}>{isChromaActive ? 'DÉSACTIVER' : 'ACTIVER CHROMA'}</button>
+              <button onClick={() => setIsChromaPanelOpen(false)} className="flex-1 py-3 rounded bg-slate-700 text-white font-bold text-xs">FERMER</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isPipPanelOpen && (
+        <div className="fixed inset-0 z-[110] bg-black/80 flex items-center justify-center p-4">
+          <section className="w-full max-w-md bg-slate-900 border border-orange-700 rounded-xl p-4 space-y-4 shadow-2xl">
+            <header className="flex items-center justify-between">
+              <h2 className="text-sm font-black text-orange-400 tracking-widest">PICTURE IN PICTURE</h2>
+              <button onClick={() => setIsPipPanelOpen(false)} className="min-w-10 min-h-10 rounded bg-slate-800 text-white">✕</button>
+            </header>
+            <label className="block text-[10px] font-bold text-slate-400">SOURCE SECONDAIRE</label>
+            <select value={pipSourceChannel} onChange={(event) => setPipSourceChannel(Number(event.target.value))} className="w-full bg-slate-800 text-white p-3 rounded border border-slate-700 text-sm">
+              {[1,2,3,4,5,6,7,8].map((channel) => <option key={channel} value={channel}>CAM {channel}</option>)}
+            </select>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-slate-300"><span>Taille de la fenêtre</span><strong>{Math.round(pipScale * 100)} %</strong></div>
+              <input type="range" min="0.18" max="0.42" step="0.01" value={pipScale} onChange={(event) => setPipScale(Number(event.target.value))} className="w-full" />
+            </div>
+            <label className="block text-[10px] font-bold text-slate-400">POSITION</label>
+            <select value={pipPosition} onChange={(event) => setPipPosition(event.target.value as typeof pipPosition)} className="w-full bg-slate-800 text-white p-3 rounded border border-slate-700 text-sm">
+              <option value="top-left">Haut gauche</option>
+              <option value="top-right">Haut droite</option>
+              <option value="bottom-left">Bas gauche</option>
+              <option value="bottom-right">Bas droite</option>
+            </select>
+            {pipSourceChannel === programChannel && <p className="text-xs text-amber-300">Choisissez une caméra différente de la source PGM pour afficher le PIP.</p>}
+            <div className="flex gap-2">
+              <button onClick={() => setIsPipActive(!isPipActive)} className={`flex-1 py-3 rounded font-black text-xs ${isPipActive ? 'bg-orange-700 text-white' : 'bg-slate-700 text-slate-200'}`}>{isPipActive ? 'DÉSACTIVER PIP' : 'ACTIVER PIP'}</button>
+              <button onClick={() => setIsPipPanelOpen(false)} className="flex-1 py-3 rounded bg-slate-700 text-white font-bold text-xs">FERMER</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <AudioMixerPanel open={isAudioPanelOpen} onClose={() => setIsAudioPanelOpen(false)} />
 
       {isDskPanelOpen && (
@@ -780,6 +907,7 @@ export default function App() {
       )}
 
       <canvas ref={programCanvasRef} width={1280} height={720} className="hidden" />
+      <canvas ref={chromaCanvasRef} className="hidden" />
     </div>
   );
                 }
