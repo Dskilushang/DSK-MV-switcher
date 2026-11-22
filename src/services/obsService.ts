@@ -90,3 +90,16 @@ export async function getSceneList(): Promise<string[]> {
   const { scenes } = await obs.call('GetSceneList');
   return scenes.map((s) => String(s.sceneName));
 }
+
+export async function getObsStreamActive(): Promise<boolean> {
+  const status = await obs.call('GetStreamStatus');
+  return Boolean(status.outputActive);
+}
+
+export async function startObsStream(): Promise<void> {
+  await obs.call('StartStream');
+}
+
+export async function stopObsStream(): Promise<void> {
+  await obs.call('StopStream');
+}
