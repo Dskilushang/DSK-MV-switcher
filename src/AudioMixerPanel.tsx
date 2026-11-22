@@ -42,6 +42,7 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
   const [selectedDevices, setSelectedDevices] = useState<Record<number, string>>({});
   const [channels, setChannels] = useState<AudioChannelSnapshot[]>([]);
   const [masterMeter, setMasterMeter] = useState<AudioMeterReading>({ rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY });
+  const [masterGain, setMasterGain] = useState(1);
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Moteur audio arrêté');
@@ -76,6 +77,30 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
     };
   }, []);
 
+  const refreshInputDevices = async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    setError('');
+    let permissionError: unknown = null;
+    try {
+      const permissionStream = await engine.requestInputStream();
+      permissionStream.getTracks().forEach((track) => track.stop());
+    } catch (cause) {
+      permissionError = cause;
+    }
+
+    try {
+      const inputDevices = await engine.listInputDevices();
+      setDevices(inputDevices);
+      setStatus(`Moteur actif · ${inputDevices.length} entrée(s)`);
+      if (permissionError) {
+        setError(permissionError instanceof Error ? permissionError.message : 'Autorisation du microphone non accordée.');
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de récupérer les entrées audio.');
+    }
+  };
+
   const activateEngine = async () => {
     if (engineRef.current) return;
     setError('');
@@ -86,20 +111,8 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
       await engine.resume();
       engineRef.current = engine;
       setChannels(engine.getAllChannelSnapshots());
-
-      // A short permission request unlocks device labels on browsers that hide them
-      // until microphone permission has been granted. The temporary stream is stopped.
-      try {
-        const permissionStream = await engine.requestInputStream();
-        permissionStream.getTracks().forEach((track) => track.stop());
-      } catch (permissionError) {
-        setError(permissionError instanceof Error ? permissionError.message : 'Autorisation du microphone non accordée.');
-      }
-
-      const inputDevices = await engine.listInputDevices();
-      setDevices(inputDevices);
       setEngineReady(true);
-      setStatus('Moteur actif · 8 canaux');
+      await refreshInputDevices();
     } catch (cause) {
       if (engine) await engine.dispose();
       engineRef.current = null;
@@ -167,6 +180,12 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
     refreshMeters();
   };
 
+  const updateMasterGain = (value: number) => {
+    engineRef.current?.setMasterGain(value);
+    setMasterGain(value);
+    refreshMeters();
+  };
+
   if (!open) return null;
 
   return (
@@ -178,9 +197,13 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
             <p className="text-[10px] text-slate-400">{status}</p>
           </div>
           <div className="flex items-center gap-2">
-            {!engineReady && (
+            {!engineReady ? (
               <button onClick={() => void activateEngine()} className="rounded bg-emerald-700 px-3 py-2 text-[10px] font-bold text-white">
                 ACTIVER LE MOTEUR
+              </button>
+            ) : (
+              <button onClick={() => void refreshInputDevices()} className="rounded bg-slate-700 px-3 py-2 text-[10px] font-bold text-white">
+                ACTUALISER ENTRÉES
               </button>
             )}
             <button onClick={onClose} className="min-h-10 min-w-10 rounded bg-slate-800 px-3 text-lg text-white" aria-label="Fermer le mixeur">×</button>
@@ -276,6 +299,20 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
               <span className="text-slate-400">MASTER · {formatDb(masterMeter.rmsDb)}</span>
             </div>
             <Meter reading={masterMeter} />
+            <label className="mt-2 flex max-w-sm items-center gap-2 text-[9px] text-slate-400">
+              <span className="shrink-0">MASTER {Math.round(masterGain * 100)}%</span>
+              <input
+                aria-label="Gain master PGM"
+                type="range"
+                min="0"
+                max="2"
+                step="0.01"
+                value={masterGain}
+                disabled={!engineReady}
+                onChange={(event) => updateMasterGain(Number(event.target.value))}
+                className="w-full accent-amber-400"
+              />
+            </label>
             <p className="mt-1 text-[9px] text-slate-500">Sortie PGM locale et sorties ISO pré/post-fader disponibles dans le moteur. Transport réseau vers OBS non intégré à cette étape.</p>
           </div>
           <div className="text-right text-[9px] text-slate-500">
