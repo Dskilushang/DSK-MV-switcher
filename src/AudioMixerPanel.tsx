@@ -290,7 +290,11 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
             <span>PREMIÈRE TRANCHE</span>
             <select
               value={multiChannelStart}
-              onChange={(event) => setMultiChannelStart(Number(event.target.value))}
+              onChange={(event) => {
+                const nextStart = Number(event.target.value);
+                setMultiChannelStart(nextStart);
+                setMultiChannelCount((current) => Math.min(current, CHANNEL_COUNT - nextStart + 1));
+              }}
               disabled={!engineReady || !!multiChannelGroup}
               className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
             >
@@ -305,8 +309,7 @@ export default function AudioMixerPanel({ open, onClose }: AudioMixerPanelProps)
               disabled={!engineReady || !!multiChannelGroup}
               className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
             >
-              {[2, 4, 6, 8].filter((value) => value <= CHANNEL_COUNT - multiChannelStart + 1).map((value) => <option key={value} value={value}>{value} canaux</option>)}
-              <option value={1}>1 canal</option>
+              {Array.from({ length: CHANNEL_COUNT - multiChannelStart + 1 }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{value} {value === 1 ? 'canal' : 'canaux'}</option>)}
             </select>
           </label>
           {multiChannelGroup ? (
