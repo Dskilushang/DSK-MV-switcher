@@ -506,7 +506,7 @@ export default function App() {
           <button onClick={() => setIsLogoActive(!isLogoActive)} className={`w-12 h-10 rounded text-[9px] font-bold ${isLogoActive ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'}`}>LOGO</button>
           <button onClick={() => setIsDskPanelOpen(true)} className="w-12 h-10 rounded text-[9px] font-bold bg-amber-700 text-white border border-amber-500">DSK</button>
           
-          <button onClick={() => setIsFrozen(!isFrozen)} className={`w-12 h-10 rounded text-[9px] font-bold ${isFrozen ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>FREEZE</button>
+          <button onClick={() => setIsFrozen(!isFrozen)} disabled={isAutoTransitioning} className={`w-12 h-10 rounded text-[9px] font-bold disabled:opacity-40 ${isFrozen ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>FREEZE</button>
           <button onClick={() => setIsAudioPanelOpen(true)} className="w-12 h-10 rounded text-[9px] font-bold bg-amber-700 text-white border border-amber-500">AUDIO</button>
         </div>
 
