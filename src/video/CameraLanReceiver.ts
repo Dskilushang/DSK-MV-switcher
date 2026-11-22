@@ -34,7 +34,7 @@ export class CameraLanReceiver {
     void this.disconnect();
     this.stopped = false;
 
-    const cleanHost = host.trim().replace(/^https?:\\/\\//i, '').replace(/\\/+$/, '');
+    const cleanHost = host.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
     if (!cleanHost || /[/?#]/.test(cleanHost)) {
       throw new Error('Saisissez l’adresse IP du PC Receiver sans chemin.');
     }
