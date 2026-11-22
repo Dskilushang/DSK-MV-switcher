@@ -95,6 +95,7 @@ export class AudioLanTransport {
     const socket = new WebSocket(`ws://${host}:${port}/signal?role=sender&stream=${streamId}`);
     const peer = new RTCPeerConnection({ iceServers: [] });
     const session = { socket, peer, streamId };
+    const pendingRemoteCandidates: RTCIceCandidateInit[] = [];
     this.sessions.set(streamId, session);
     this.onStatus({ state: 'connecting', streamId });
 
@@ -140,8 +141,11 @@ export class AudioLanTransport {
           socket.send(JSON.stringify({ type: 'offer', sdp: peer.localDescription }));
         } else if (message.type === 'answer' && message.sdp) {
           await peer.setRemoteDescription(message.sdp);
+          for (const candidate of pendingRemoteCandidates) await peer.addIceCandidate(candidate);
+          pendingRemoteCandidates.length = 0;
         } else if (message.type === 'candidate' && message.candidate) {
-          await peer.addIceCandidate(message.candidate);
+          if (peer.remoteDescription) await peer.addIceCandidate(message.candidate);
+          else pendingRemoteCandidates.push(message.candidate);
         } else if (message.type === 'peer-left') {
           this.onStatus({ state: 'disconnected', streamId });
         } else if (message.type === 'error') {
