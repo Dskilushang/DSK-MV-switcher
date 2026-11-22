@@ -22,7 +22,7 @@ npm start
 
 The receiver listens on port 8765 by default. Set `DSK_RECEIVER_PORT` to change it. It binds to all network interfaces; restrict access to a trusted LAN and allow the chosen TCP signaling port in the computer firewall. WebRTC media also uses dynamically negotiated UDP ports; allow Node.js/OBS WebRTC traffic on the Windows Private network profile.
 
-Open `http://127.0.0.1:8765/health` on the PC. The response should report `"status":"ready"`.
+Open `http://127.0.0.1:8765` on the PC itself. Copy the generated pairing code shown there into the DSK Audio panel. The code is stored locally in `receiver/.receiver-token` and is not committed to Git. The health endpoint is available at `http://127.0.0.1:8765/health`.
 
 Find the PC's LAN IPv4 address (for example, 192.168.1.100) and enter it in DSK Audio > Liaison PC / OBS. The default signaling port is 8765.
 
@@ -42,7 +42,7 @@ Create nine separate **Browser** sources. Use the PC loopback address, not the t
 | DSK ISO 7 | `http://127.0.0.1:8765/obs/iso-7` |
 | DSK ISO 8 | `http://127.0.0.1:8765/obs/iso-8` |
 
-For each Browser source, enable **Control audio via OBS** in its properties. Keep the sources separate in the OBS Audio Mixer. Configure the OBS audio track assignments deliberately: PGM to the desired stereo program track and each ISO source to its own track. Do not route all ISO sources to one track if isolated recording is required.
+The `/obs/...` pages are restricted to loopback access and are intended to be opened by OBS on the same PC. For each Browser source, enable **Control audio via OBS** in its properties. Keep the sources separate in the OBS Audio Mixer. Configure the OBS audio track assignments deliberately: PGM to the desired stereo program track and each ISO source to its own track. Do not route all ISO sources to one track if isolated recording is required.
 
 ## Transport notes
 
@@ -50,5 +50,5 @@ For each Browser source, enable **Control audio via OBS** in its properties. Kee
 - Each stream uses a separate peer connection, preserving independent OBS source routing.
 - ICE is configured without public STUN/TURN servers because this first receiver is designed for a shared LAN.
 - The receiver does not expose virtual audio devices or install OBS plugins.
-- The receiver currently has no pairing/authentication. HTTP/WebSocket signaling is not encrypted; WebRTC media itself is protected by DTLS-SRTP. Use only on a trusted production LAN and restrict the signaling port with the firewall.
+- The sender and receiver signaling sessions require the generated pairing code. The code is displayed only on the local PC page and stored in an ignored local file. HTTP/WebSocket signaling is not encrypted; WebRTC media itself is protected by DTLS-SRTP. Use only on a trusted production LAN and restrict the signaling port with the firewall.
 - Browser-source audio capture and Android WebView WebSocket/WebRTC behavior require final end-to-end validation. This code is the first transport implementation, not a claim that the physical workflow has already passed testing.
