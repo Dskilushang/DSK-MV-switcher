@@ -202,6 +202,7 @@ export default function App() {
   const disconnectRemoteCameras = () => {
     void cameraReceiverRef.current?.disconnect();
     cameraReceiverRef.current = null;
+    Object.values(remoteVideoRefs.current).forEach((video) => { if (video) video.srcObject = null; });
     setRemoteCameraStreams({});
     setCameraReceiverStatuses({});
     setCameraReceiverMessage('Réception vidéo arrêtée.');
