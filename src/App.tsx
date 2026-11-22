@@ -79,6 +79,7 @@ export default function App() {
     try {
       if (mediaAudioRoutedChannel !== null && mediaAudioRoutedChannel !== mediaAudioChannel) {
         route.disconnect(mediaAudioRoutedChannel);
+        setMediaAudioRoutedChannel(null);
       }
       route.connect(mediaAudioChannel, video);
       setMediaAudioRoutedChannel(mediaAudioChannel);
@@ -798,7 +799,7 @@ export default function App() {
           <div className="h-[34%] min-h-0 grid grid-cols-2 gap-1">
             <div className="relative min-w-0 min-h-0 bg-slate-950 border border-red-600 rounded overflow-hidden">
               <video ref={programMonitorRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain" />
-              <span className="absolute top-1 left-1 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PGM · PROGRAM</span>
+              <span className="absolute top-1 left-1 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PGM · {programChannel === 9 ? 'MEDIA' : `CAM ${programChannel}`}</span>
             </div>
             <div className="relative min-w-0 min-h-0 bg-slate-950 border border-emerald-600 rounded overflow-hidden">
               <video ref={previewMonitorRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain" />
@@ -1159,10 +1160,8 @@ export default function App() {
               {(mediaAudioError || !isMediaAudioRouteReady) && <p className="text-[10px] text-amber-300">{mediaAudioError || 'Ouvrez AUDIO et activez le moteur pour rendre le routage disponible.'}</p>}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => { if (mediaUrl) setPreviewChannel(9); setIsMediaPanelOpen(false); }} disabled={!mediaUrl || isFrozen || isAutoTransitioning} className="flex-1 rounded bg-emerald-700 py-3 text-xs font-black text-white disabled:opacity-40">ENVOYER VERS PVW</button>
-              <button onClick={() => { if (mediaUrl) { setPreviewChannel(9); setIsMediaPanelOpen(false); } }} disabled={!mediaUrl || isFrozen || isAutoTransitioning} className="flex-1 rounded bg-red-700 py-3 text-xs font-black text-white disabled:opacity-40">PRÉPARER MEDIA</button>
-            </div>
+            <button onClick={() => { if (mediaUrl) setPreviewChannel(9); setIsMediaPanelOpen(false); }} disabled={!mediaUrl || isFrozen || isAutoTransitioning} className="w-full rounded bg-emerald-700 py-3 text-xs font-black text-white disabled:opacity-40">ENVOYER MEDIA VERS PVW</button>
+            <p className="text-center text-[10px] text-slate-400">Quand MEDIA est en PVW, utilisez CUT, AUTO ou le T-Bar pour l’envoyer en PGM.</p>
           </section>
         </div>
       )}
