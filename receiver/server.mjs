@@ -1,8 +1,28 @@
 import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { randomBytes } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 const HOST = process.env.DSK_RECEIVER_HOST || '0.0.0.0';
 const PORT = Number(process.env.DSK_RECEIVER_PORT || 8765);
+const TOKEN_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), '.receiver-token');
+let receiverToken = process.env.DSK_RECEIVER_TOKEN?.trim();
+if (!receiverToken) {
+  try {
+    receiverToken = (await readFile(TOKEN_PATH, 'utf8')).trim();
+  } catch {
+    receiverToken = randomBytes(24).toString('hex');
+    await writeFile(TOKEN_PATH, receiverToken, { flag: 'wx' });
+  }
+}
+if (receiverToken.length < 16) throw new Error('DSK_RECEIVER_TOKEN must contain at least 16 characters.');
+console.log('DSK Audio Receiver pairing code: ' + receiverToken);
+
+function isLoopback(address = '') {
+  return address === '127.0.0.1' || address === '::1' || address.startsWith('::ffff:127.');
+}
 const VALID_STREAMS = new Set(['pgm', ...Array.from({ length: 8 }, (_, index) => `iso-${index + 1}`)]);
 const rooms = new Map();
 
@@ -18,6 +38,7 @@ function page(streamId) {
 <body><div id="state">DSK AUDIO · ${streamId.toUpperCase()} · INITIALISATION</div><audio id="audio" autoplay playsinline></audio>
 <script>
 const streamId = ${JSON.stringify(streamId)};
+const receiverToken = ${JSON.stringify(receiverToken)};
 const state = document.getElementById('state');
 const audio = document.getElementById('audio');
 let peer;
@@ -26,7 +47,7 @@ let pendingCandidates = [];
 function setState(value){state.textContent='DSK AUDIO · '+streamId.toUpperCase()+' · '+value;}
 function start(){
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  socket = new WebSocket(scheme+'//'+location.host+'/signal?role=receiver&stream='+encodeURIComponent(streamId));
+  socket = new WebSocket(scheme+'//'+location.host+'/signal?role=receiver&stream='+encodeURIComponent(streamId)+'&token='+encodeURIComponent(receiverToken));
   socket.onopen=()=>{socket.send(JSON.stringify({type:'register',role:'receiver',stream:streamId}));setState('EN ATTENTE DU MIXEUR');};
   socket.onmessage=async(event)=>{
     try{
@@ -76,6 +97,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
   const match = url.pathname.match(/^\/obs\/(pgm|iso-[1-8])$/);
+  if (match && !isLoopback(request.socket.remoteAddress || '')) {
+    response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+    response.end('OBS receiver pages are available only on this PC.');
+    return;
+  }
   if (match) {
     response.writeHead(200, {
       'content-type': 'text/html; charset=utf-8',
@@ -86,8 +112,13 @@ const server = http.createServer(async (request, response) => {
     return;
   }
   if (url.pathname === '/') {
-    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    response.end('<!doctype html><html lang="fr"><meta charset="utf-8"><title>DSK Audio Receiver</title><body style="font:16px Arial;background:#0b1220;color:white;padding:32px"><h1>DSK Audio Receiver</h1><p>Service de réception audio prêt.</p><p>Dans OBS, ajoutez 9 sources Navigateur en utilisant les adresses /obs/pgm et /obs/iso-1 à /obs/iso-8.</p><p>État : <a style="color:#7dd3fc" href="/health">/health</a></p></body></html>');
+    if (!isLoopback(request.socket.remoteAddress || '')) {
+      response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end('Open this page on the OBS computer itself.');
+      return;
+    }
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    response.end('<!doctype html><html lang="fr"><meta charset="utf-8"><title>DSK Audio Receiver</title><body style="font:16px Arial;background:#0b1220;color:white;padding:32px"><h1>DSK Audio Receiver</h1><p>Service de réception audio prêt.</p><h2>Code d’association DSK</h2><code style="display:block;padding:16px;background:#172033;word-break:break-all">' + receiverToken + '</code><p>Copiez ce code dans DSK Audio sur la tablette. Il reste enregistré localement dans receiver/.receiver-token.</p><p>Ajoutez ensuite les 9 sources Navigateur OBS : /obs/pgm et /obs/iso-1 à /obs/iso-8.</p><p>État : <a style="color:#7dd3fc" href="/health">/health</a></p></body></html>');
     return;
   }
   response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
@@ -108,6 +139,12 @@ wss.on('connection', (socket, request) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
   const role = url.searchParams.get('role');
   const streamId = url.searchParams.get('stream');
+  const token = url.searchParams.get('token') || '';
+  if (token !== receiverToken) {
+    send(socket, { type: 'error', message: 'Code d’association incorrect.' });
+    socket.close();
+    return;
+  }
   if (!['sender', 'receiver'].includes(role) || !VALID_STREAMS.has(streamId)) {
     send(socket, { type: 'error', message: 'Rôle ou flux invalide.' });
     socket.close();
