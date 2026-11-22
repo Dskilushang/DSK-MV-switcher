@@ -250,6 +250,7 @@ export default function App() {
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     let cancelled = false;
     let lastProcessedAt = 0;
