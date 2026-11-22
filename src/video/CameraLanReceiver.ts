@@ -120,14 +120,13 @@ export class CameraLanReceiver {
           candidate?: RTCIceCandidateInit;
           message?: string;
         };
-        if (message.type === 'sender-ready') {
-          const offer = await peer.createOffer();
-          await peer.setLocalDescription(offer);
-          socket.send(JSON.stringify({ type: 'offer', sdp: peer.localDescription }));
-        } else if (message.type === 'answer' && message.sdp) {
+        if (message.type === 'offer' && message.sdp) {
           await peer.setRemoteDescription(message.sdp);
           for (const candidate of pendingCandidates) await peer.addIceCandidate(candidate);
           pendingCandidates.length = 0;
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+          socket.send(JSON.stringify({ type: 'answer', sdp: peer.localDescription }));
         } else if (message.type === 'candidate' && message.candidate) {
           if (peer.remoteDescription) await peer.addIceCandidate(message.candidate);
           else pendingCandidates.push(message.candidate);
