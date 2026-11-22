@@ -96,6 +96,7 @@ export class CameraLanReceiver {
       if (peer.connectionState === 'connected') {
         this.onStatus({ cameraId, state: 'connected' });
       } else if (peer.connectionState === 'failed') {
+        this.onStream(cameraId, null);
         this.onStatus({
           cameraId,
           state: 'error',
