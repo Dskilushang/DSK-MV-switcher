@@ -807,8 +807,10 @@ export default function App() {
                 ref={mediaVideoRef}
                 src={mediaUrl || undefined}
                 loop={mediaLoop}
+                preload="metadata"
                 playsInline
                 muted={mediaAudioRoutedChannel === null}
+                onError={() => setMediaAudioError('Format vidéo ou codec non pris en charge par cet appareil.')}
                 onLoadedMetadata={(event) => setMediaDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
                 onTimeUpdate={(event) => setMediaCurrentTime(event.currentTarget.currentTime)}
                 onPlay={() => setIsMediaPlaying(true)}
@@ -1117,7 +1119,7 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-4 gap-2">
-              <button onClick={() => { const video = mediaVideoRef.current; if (video) void video.play().catch((error) => setMediaAudioError(error instanceof Error ? error.message : 'Lecture impossible.')); }} disabled={!mediaUrl} className="rounded bg-emerald-700 py-3 text-xs font-black text-white disabled:opacity-40">LECTURE</button>
+              <button onClick={() => { const video = mediaVideoRef.current; if (video) void video.play().catch((error) => setMediaAudioError(error instanceof Error ? error.message : 'Lecture impossible.')); }} disabled={!mediaUrl} className="rounded bg-emerald-700 py-3 text-xs font-black text-white disabled:opacity-40">{isMediaPlaying ? 'EN COURS' : 'LECTURE'}</button>
               <button onClick={() => mediaVideoRef.current?.pause()} disabled={!mediaUrl} className="rounded bg-amber-700 py-3 text-xs font-black text-white disabled:opacity-40">PAUSE</button>
               <button onClick={() => { const video = mediaVideoRef.current; if (video) { video.pause(); video.currentTime = 0; setMediaCurrentTime(0); } }} disabled={!mediaUrl} className="rounded bg-slate-700 py-3 text-xs font-black text-white disabled:opacity-40">STOP</button>
               <button onClick={() => setMediaLoop((value) => !value)} disabled={!mediaUrl} className={`rounded py-3 text-xs font-black disabled:opacity-40 ${mediaLoop ? 'bg-sky-700 text-white' : 'bg-slate-700 text-slate-300'}`}>BOUCLE {mediaLoop ? 'ON' : 'OFF'}</button>
