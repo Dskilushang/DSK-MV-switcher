@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
-import AudioMixerPanel from './AudioMixerPanel';
+import AudioMixerPanel, { type MediaAudioRoute } from './AudioMixerPanel';
 import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
 import { connectObs, disconnectObs, getSceneList, getObsStreamActive, registerCallbacks, setProgramScene, startObsStream, stopObsStream, type ObsStatus } from './services/obsService';
 
@@ -16,6 +16,83 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMessage, setRecordingMessage] = useState('');
   const [programAudioStream, setProgramAudioStream] = useState<MediaStream | null>(null);
+  const [isMediaPanelOpen, setIsMediaPanelOpen] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaFileName, setMediaFileName] = useState('');
+  const [mediaLoop, setMediaLoop] = useState(false);
+  const [mediaDuration, setMediaDuration] = useState(0);
+  const [mediaCurrentTime, setMediaCurrentTime] = useState(0);
+  const [isMediaPlaying, setIsMediaPlaying] = useState(false);
+  const [mediaAudioChannel, setMediaAudioChannel] = useState(8);
+  const [mediaAudioRoutedChannel, setMediaAudioRoutedChannel] = useState<number | null>(null);
+  const [isMediaAudioRouteReady, setIsMediaAudioRouteReady] = useState(false);
+  const [mediaAudioError, setMediaAudioError] = useState('');
+  const mediaVideoRef = useRef<HTMLVideoElement>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
+  const mediaAudioRouteRef = useRef<MediaAudioRoute | null>(null);
+
+  const handleMediaAudioRouteReady = useCallback((route: MediaAudioRoute | null) => {
+    mediaAudioRouteRef.current = route;
+    setIsMediaAudioRouteReady(!!route);
+    if (!route) setMediaAudioRoutedChannel(null);
+  }, []);
+
+  const handleMediaFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const nextUrl = URL.createObjectURL(file);
+    setMediaUrl(nextUrl);
+    setMediaFileName(file.name);
+    setMediaCurrentTime(0);
+    setMediaDuration(0);
+    setIsMediaPlaying(false);
+    setMediaAudioError('');
+    event.target.value = '';
+  };
+
+  const removeMediaFile = () => {
+    const video = mediaVideoRef.current;
+    video?.pause();
+    if (video) video.currentTime = 0;
+    if (mediaAudioRoutedChannel !== null) {
+      mediaAudioRouteRef.current?.disconnect(mediaAudioRoutedChannel);
+      setMediaAudioRoutedChannel(null);
+    }
+    setMediaUrl(null);
+    setMediaFileName('');
+    setMediaCurrentTime(0);
+    setMediaDuration(0);
+    setIsMediaPlaying(false);
+  };
+
+  const routeMediaAudio = () => {
+    const video = mediaVideoRef.current;
+    const route = mediaAudioRouteRef.current;
+    if (!video || !mediaUrl) {
+      setMediaAudioError('Chargez d’abord un fichier vidéo.');
+      return;
+    }
+    if (!route) {
+      setMediaAudioError('Activez d’abord le moteur dans le mixeur AUDIO.');
+      return;
+    }
+    try {
+      if (mediaAudioRoutedChannel !== null && mediaAudioRoutedChannel !== mediaAudioChannel) {
+        route.disconnect(mediaAudioRoutedChannel);
+      }
+      route.connect(mediaAudioChannel, video);
+      setMediaAudioRoutedChannel(mediaAudioChannel);
+      setMediaAudioError(`Audio MEDIA routé vers CH ${mediaAudioChannel}.`);
+    } catch (error) {
+      setMediaAudioError(error instanceof Error ? error.message : 'Routage audio MEDIA impossible.');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+    };
+  }, [mediaUrl]);
   
   // --- EFFETS ---
   const [isChromaActive, setIsChromaActive] = useState(false);
@@ -259,9 +336,11 @@ export default function App() {
     }
     if (!isChromaActive || !chromaCanvasRef.current) return;
 
-    const video = programChannel === 1
-      ? localVideoRef.current
-      : remoteVideoRefs.current[programChannel];
+    const video = programChannel === 9
+      ? mediaVideoRef.current
+      : programChannel === 1
+        ? localVideoRef.current
+        : remoteVideoRefs.current[programChannel];
     const canvas = chromaCanvasRef.current;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!video || !ctx) {
@@ -311,7 +390,7 @@ export default function App() {
         chromaAnimationRef.current = null;
       }
     };
-  }, [isChromaActive, programChannel, cameraStream, remoteCameraStreams, chromaKeyColor, chromaThreshold]);
+  }, [isChromaActive, programChannel, cameraStream, remoteCameraStreams, mediaUrl, chromaKeyColor, chromaThreshold]);
 
   // --- MOTEUR DU CANVAS (GÈRE LE FREEZE, LE FONDU ET LE LOGO) ---
   useEffect(() => {
@@ -337,7 +416,7 @@ export default function App() {
 
       const drawSource = (ch: number, opacity: number) => {
         ctx.globalAlpha = opacity;
-        const sourceVideo = ch === 1 ? localVideoRef.current : remoteVideoRefs.current[ch];
+        const sourceVideo = ch === 9 ? mediaVideoRef.current : ch === 1 ? localVideoRef.current : remoteVideoRefs.current[ch];
         if (
           isChromaActive &&
           ch === programChannel &&
@@ -361,9 +440,11 @@ export default function App() {
 
       // PIP : seconde source vidéo composée dans le programme.
       if (isPipActive && pipSourceChannel !== programChannel) {
-        const pipVideo = pipSourceChannel === 1
-          ? localVideoRef.current
-          : remoteVideoRefs.current[pipSourceChannel];
+        const pipVideo = pipSourceChannel === 9
+          ? mediaVideoRef.current
+          : pipSourceChannel === 1
+            ? localVideoRef.current
+            : remoteVideoRefs.current[pipSourceChannel];
         if (pipVideo && pipVideo.readyState >= 2 && pipVideo.videoWidth > 0) {
           const aspect = pipVideo.videoWidth / pipVideo.videoHeight;
           let pipWidth = canvas.width * pipScale;
@@ -442,7 +523,7 @@ export default function App() {
     };
     draw();
     return () => cancelAnimationFrame(frameId);
-  }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
+  }, [programChannel, previewChannel, remoteCameraStreams, mediaUrl, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
 
   // --- MONITEURS PGM / PVW ---
   useEffect(() => {
@@ -461,6 +542,11 @@ export default function App() {
   useEffect(() => {
     const video = previewMonitorRef.current;
     if (!video) return;
+    if (previewChannel === 9) {
+      video.pause();
+      video.srcObject = null;
+      return;
+    }
     const stream = previewChannel === 1 ? cameraStream : remoteCameraStreams[previewChannel] || null;
     video.srcObject = stream;
     if (stream) void video.play().catch(() => undefined);
@@ -704,6 +790,7 @@ export default function App() {
           
           <button onClick={() => setIsFrozen(!isFrozen)} disabled={isAutoTransitioning} className={`w-12 h-10 rounded text-[9px] font-bold disabled:opacity-40 ${isFrozen ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>FREEZE</button>
           <button onClick={() => setIsAudioPanelOpen(true)} className="w-12 h-10 rounded text-[9px] font-bold bg-amber-700 text-white border border-amber-500">AUDIO</button>
+          <button onClick={() => setIsMediaPanelOpen(true)} className={`w-12 h-10 rounded text-[9px] font-bold border ${mediaUrl ? 'bg-sky-700 border-sky-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>MEDIA</button>
         </div>
 
         {/* CENTRE : MultiView */}
@@ -715,7 +802,21 @@ export default function App() {
             </div>
             <div className="relative min-w-0 min-h-0 bg-slate-950 border border-emerald-600 rounded overflow-hidden">
               <video ref={previewMonitorRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain" />
-              <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PVW · PREVIEW</span>
+              <video
+                ref={mediaVideoRef}
+                src={mediaUrl || undefined}
+                loop={mediaLoop}
+                playsInline
+                muted={mediaAudioRoutedChannel === null}
+                onLoadedMetadata={(event) => setMediaDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
+                onTimeUpdate={(event) => setMediaCurrentTime(event.currentTarget.currentTime)}
+                onPlay={() => setIsMediaPlaying(true)}
+                onPause={() => setIsMediaPlaying(false)}
+                onEnded={() => setIsMediaPlaying(false)}
+                className={`absolute inset-0 h-full w-full object-contain ${previewChannel === 9 ? 'block' : 'hidden'}`}
+              />
+              <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PVW · {previewChannel === 9 ? 'MEDIA' : 'PREVIEW'}</span>
+              {previewChannel === 9 && !mediaUrl && <span className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">Aucun média chargé</span>}
             </div>
           </div>
           <div className="flex-1 min-h-0 grid grid-cols-4 grid-rows-2 gap-1 overflow-hidden">
@@ -801,6 +902,11 @@ export default function App() {
               </button>
             );
           })}
+          <button
+            onClick={() => !isFrozen && !isAutoTransitioning && setPreviewChannel(9)}
+            disabled={isFrozen || isAutoTransitioning || !mediaUrl}
+            className={`w-12 min-w-12 h-10 rounded text-[9px] font-black border-b-2 disabled:opacity-40 ${programChannel === 9 ? 'bg-red-600 border-red-800 text-white' : previewChannel === 9 ? 'bg-green-600 border-green-800 text-white' : 'bg-sky-800 border-sky-950 text-sky-100'}`}
+          >MEDIA</button>
         </div>
         
         <div className="w-8 text-right text-[8px] text-slate-500 font-bold shrink-0">DSK-MV</div>
@@ -935,7 +1041,7 @@ export default function App() {
               <h2 className="text-sm font-black text-emerald-400 tracking-widest">CHROMA KEY</h2>
               <button onClick={() => setIsChromaPanelOpen(false)} className="min-w-10 min-h-10 rounded bg-slate-800 text-white">✕</button>
             </header>
-            <p className="text-xs text-slate-400">Détourage appliqué à la source actuellement en PGM : CAM {programChannel}. Utilisez un fond vert ou bleu uniforme et un éclairage régulier.</p>
+            <p className="text-xs text-slate-400">Détourage appliqué à la source actuellement en PGM : {programChannel === 9 ? 'MEDIA' : `CAM ${programChannel}`}. Utilisez un fond vert ou bleu uniforme et un éclairage régulier.</p>
             <label className="block text-[10px] font-bold text-slate-400">COULEUR À SUPPRIMER</label>
             <select value={chromaKeyColor} onChange={(event) => setChromaKeyColor(event.target.value as 'green' | 'blue')} className="w-full bg-slate-800 text-white p-3 rounded border border-slate-700 text-sm">
               <option value="green">Vert (Green Screen)</option>
@@ -962,7 +1068,7 @@ export default function App() {
             </header>
             <label className="block text-[10px] font-bold text-slate-400">SOURCE SECONDAIRE</label>
             <select value={pipSourceChannel} onChange={(event) => setPipSourceChannel(Number(event.target.value))} className="w-full bg-slate-800 text-white p-3 rounded border border-slate-700 text-sm">
-              {[1,2,3,4,5,6,7,8].map((channel) => <option key={channel} value={channel}>CAM {channel}</option>)}
+              {[1,2,3,4,5,6,7,8,9].map((channel) => <option key={channel} value={channel}>{channel === 9 ? 'MEDIA' : `CAM ${channel}`}</option>)}
             </select>
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-slate-300"><span>Taille de la fenêtre</span><strong>{Math.round(pipScale * 100)} %</strong></div>
@@ -984,7 +1090,82 @@ export default function App() {
         </div>
       )}
 
-      <AudioMixerPanel open={isAudioPanelOpen} onClose={() => setIsAudioPanelOpen(false)} onProgramStreamChange={setProgramAudioStream} />
+      <AudioMixerPanel
+        open={isAudioPanelOpen}
+        onClose={() => setIsAudioPanelOpen(false)}
+        onProgramStreamChange={setProgramAudioStream}
+        onMediaAudioRouteReady={handleMediaAudioRouteReady}
+      />
+
+      {isMediaPanelOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/85 p-4">
+          <section className="w-full max-w-xl space-y-4 rounded-xl border border-sky-700 bg-slate-900 p-4 shadow-2xl">
+            <header className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-black tracking-widest text-sky-300">DSK MEDIA · PLAYBACK</h2>
+                <p className="text-[10px] text-slate-400">Source indépendante · MEDIA 9 · CAM1–CAM8 conservées</p>
+              </div>
+              <button onClick={() => setIsMediaPanelOpen(false)} className="min-h-10 min-w-10 rounded bg-slate-800 text-white">✕</button>
+            </header>
+
+            <input ref={mediaFileInputRef} type="file" accept="video/*" onChange={handleMediaFileChange} className="hidden" />
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => mediaFileInputRef.current?.click()} className="rounded bg-sky-700 px-4 py-3 text-xs font-black text-white">CHARGER UNE VIDÉO</button>
+              <button onClick={removeMediaFile} disabled={!mediaUrl} className="rounded bg-slate-700 px-4 py-3 text-xs font-bold text-white disabled:opacity-40">RETIRER</button>
+              <span className="flex min-w-0 flex-1 items-center text-[10px] text-slate-300">{mediaFileName || 'Aucun fichier sélectionné'}</span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              <button onClick={() => { const video = mediaVideoRef.current; if (video) void video.play().catch((error) => setMediaAudioError(error instanceof Error ? error.message : 'Lecture impossible.')); }} disabled={!mediaUrl} className="rounded bg-emerald-700 py-3 text-xs font-black text-white disabled:opacity-40">LECTURE</button>
+              <button onClick={() => mediaVideoRef.current?.pause()} disabled={!mediaUrl} className="rounded bg-amber-700 py-3 text-xs font-black text-white disabled:opacity-40">PAUSE</button>
+              <button onClick={() => { const video = mediaVideoRef.current; if (video) { video.pause(); video.currentTime = 0; setMediaCurrentTime(0); } }} disabled={!mediaUrl} className="rounded bg-slate-700 py-3 text-xs font-black text-white disabled:opacity-40">STOP</button>
+              <button onClick={() => setMediaLoop((value) => !value)} disabled={!mediaUrl} className={`rounded py-3 text-xs font-black disabled:opacity-40 ${mediaLoop ? 'bg-sky-700 text-white' : 'bg-slate-700 text-slate-300'}`}>BOUCLE {mediaLoop ? 'ON' : 'OFF'}</button>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>POSITION</span>
+                <span>{Math.floor(mediaCurrentTime)} s / {Math.floor(mediaDuration)} s</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max={Math.max(0, mediaDuration)}
+                step="0.1"
+                value={Math.min(mediaCurrentTime, mediaDuration || 0)}
+                onChange={(event) => {
+                  const nextTime = Number(event.target.value);
+                  if (mediaVideoRef.current) mediaVideoRef.current.currentTime = nextTime;
+                  setMediaCurrentTime(nextTime);
+                }}
+                disabled={!mediaUrl || mediaDuration <= 0}
+                className="w-full accent-sky-400"
+              />
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-950 p-3">
+              <div className="flex items-center justify-between">
+                <strong className="text-xs text-amber-300">ROUTAGE AUDIO VERS LE MIXEUR</strong>
+                <span className={`text-[9px] font-bold ${mediaAudioRoutedChannel !== null ? 'text-emerald-400' : 'text-slate-500'}`}>{mediaAudioRoutedChannel !== null ? `CH ${mediaAudioRoutedChannel} CONNECTÉ` : 'NON ROUTÉ'}</span>
+              </div>
+              <div className="flex gap-2">
+                <select value={mediaAudioChannel} onChange={(event) => setMediaAudioChannel(Number(event.target.value))} className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white">
+                  {[1,2,3,4,5,6,7,8].map((channel) => <option key={channel} value={channel}>CH {channel}</option>)}
+                </select>
+                <button onClick={routeMediaAudio} disabled={!mediaUrl || !isMediaAudioRouteReady} className="rounded bg-amber-700 px-3 py-2 text-[10px] font-black text-white disabled:opacity-40">ROUTER AUDIO</button>
+                <button onClick={() => { if (mediaAudioRoutedChannel !== null) mediaAudioRouteRef.current?.disconnect(mediaAudioRoutedChannel); setMediaAudioRoutedChannel(null); setMediaAudioError('Routage audio déconnecté.'); }} disabled={mediaAudioRoutedChannel === null} className="rounded bg-slate-700 px-3 py-2 text-[10px] font-bold text-white disabled:opacity-40">DÉCONNECTER</button>
+              </div>
+              <p className="text-[9px] text-slate-400">Le canal choisi doit être libre. L’audio du fichier est silencieux tant qu’il n’est pas routé, afin d’éviter tout contournement du mixeur.</p>
+              {(mediaAudioError || !isMediaAudioRouteReady) && <p className="text-[10px] text-amber-300">{mediaAudioError || 'Ouvrez AUDIO et activez le moteur pour rendre le routage disponible.'}</p>}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => { if (mediaUrl) setPreviewChannel(9); setIsMediaPanelOpen(false); }} disabled={!mediaUrl || isFrozen || isAutoTransitioning} className="flex-1 rounded bg-emerald-700 py-3 text-xs font-black text-white disabled:opacity-40">ENVOYER VERS PVW</button>
+              <button onClick={() => { if (mediaUrl) { setPreviewChannel(9); setIsMediaPanelOpen(false); } }} disabled={!mediaUrl || isFrozen || isAutoTransitioning} className="flex-1 rounded bg-red-700 py-3 text-xs font-black text-white disabled:opacity-40">PRÉPARER MEDIA</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isDskPanelOpen && (
         <DskPanel
