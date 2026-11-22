@@ -31,6 +31,9 @@ jobs:
       - name: Vérifier les types TypeScript
         run: npx tsc --noEmit
 
+      - name: Vérifier la syntaxe du DSK Audio Receiver
+        run: node --check receiver/server.mjs
+
       - name: Compiler l'application web (Vite)
         run: npm run build
 
