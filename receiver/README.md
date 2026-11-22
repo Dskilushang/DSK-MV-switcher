@@ -3,7 +3,7 @@
 Companion LAN receiver for DSK-MV Switcher. It accepts nine independent WebRTC audio sessions:
 
 - `pgm`: one stereo PGM stream (left/right)
-- `iso-1` through `iso-8`: eight independent mono ISO streams
+- `iso-1` through `iso-8`: eight independent ISO streams, one per mixer channel
 
 ## Requirements
 
@@ -50,5 +50,5 @@ For each Browser source, enable **Control audio via OBS** in its properties. Kee
 - Each stream uses a separate peer connection, preserving independent OBS source routing.
 - ICE is configured without public STUN/TURN servers because this first receiver is designed for a shared LAN.
 - The receiver does not expose virtual audio devices or install OBS plugins.
-- The receiver currently has no authentication or encryption. Use only on a trusted production LAN; firewall the signaling port to the local network.
+- The receiver currently has no pairing/authentication. HTTP/WebSocket signaling is not encrypted; WebRTC media itself is protected by DTLS-SRTP. Use only on a trusted production LAN and restrict the signaling port with the firewall.
 - Browser-source audio capture and Android WebView WebSocket/WebRTC behavior require final end-to-end validation. This code is the first transport implementation, not a claim that the physical workflow has already passed testing.
