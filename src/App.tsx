@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
+import AudioMixerPanel from './AudioMixerPanel';
 import { connectObs, disconnectObs, getSceneList, registerCallbacks, setProgramScene, type ObsStatus } from './services/obsService';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const [isPipActive, setIsPipActive] = useState(false);
   const [isLogoActive, setIsLogoActive] = useState(false); // Contrôle l'affichage du logo
   const [isDskPanelOpen, setIsDskPanelOpen] = useState(false);
+  const [isAudioPanelOpen, setIsAudioPanelOpen] = useState(false);
   const [dskLayers, setDskLayers] = useState<DskLayer[]>([
     { id: 1, name: 'LOGO', type: 'image', content: '', enabled: false, x: 82, y: 8, opacity: 1, fontSize: 32 },
     { id: 2, name: 'BANDEAU', type: 'text', content: '', enabled: false, x: 5, y: 82, opacity: 1, fontSize: 28 },
@@ -42,8 +44,7 @@ export default function App() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteCameras, setRemoteCameras] = useState<{ [key: number]: string }>({});
   const remoteVideoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [audioLevels, setAudioLevels] = useState([40, 20, 60, 10, 80, 30, 50, 15]);
+
 
   // --- LOGO & RÉGLAGES ---
   const [customLogo, setCustomLogo] = useState<string | null>(null);
@@ -170,24 +171,6 @@ export default function App() {
       cameraStream?.getTracks().forEach(track => track.stop());
     };
   }, [cameraStream]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAudioLevels(prev => prev.map(l => {
-        const n = l + Math.floor(Math.random() * 30) - 15;
-        return n > 95 ? 95 : n < 5 ? 5 : n;
-      }));
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const toggleAudio = () => {
-    if (cameraStream) {
-      const track = cameraStream.getAudioTracks()[0];
-      if (track) track.enabled = isAudioMuted;
-    }
-    setIsAudioMuted(!isAudioMuted); 
-  };
 
   // --- CHROMA KEY ---
   const applyChromaKey = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
@@ -433,7 +416,7 @@ export default function App() {
           <button onClick={() => setIsDskPanelOpen(true)} className="w-12 h-10 rounded text-[9px] font-bold bg-amber-700 text-white border border-amber-500">DSK</button>
           
           <button onClick={() => setIsFrozen(!isFrozen)} className={`w-12 h-10 rounded text-[9px] font-bold ${isFrozen ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>FREEZE</button>
-          <button onClick={toggleAudio} className={`w-12 h-10 rounded text-[9px] font-bold ${isAudioMuted ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>AUDIO</button>
+          <button onClick={() => setIsAudioPanelOpen(true)} className="w-12 h-10 rounded text-[9px] font-bold bg-amber-700 text-white border border-amber-500">AUDIO</button>
         </div>
 
         {/* CENTRE : MultiView */}
@@ -626,6 +609,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <AudioMixerPanel open={isAudioPanelOpen} onClose={() => setIsAudioPanelOpen(false)} />
 
       {isDskPanelOpen && (
         <DskPanel
