@@ -4,14 +4,18 @@ import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
 import AudioMixerPanel from './AudioMixerPanel';
 import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
-import { connectObs, disconnectObs, getSceneList, registerCallbacks, setProgramScene, type ObsStatus } from './services/obsService';
+import { connectObs, disconnectObs, getSceneList, getObsStreamActive, registerCallbacks, setProgramScene, startObsStream, stopObsStream, type ObsStatus } from './services/obsService';
 
 export default function App() {
   // --- ÉTATS DU MÉLANGEUR ---
   const [programChannel, setProgramChannel] = useState(1);
   const [previewChannel, setPreviewChannel] = useState(2);
   const [isLive, setIsLive] = useState(false);
+  const [isLiveBusy, setIsLiveBusy] = useState(false);
+  const [liveMessage, setLiveMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingMessage, setRecordingMessage] = useState('');
+  const [programAudioStream, setProgramAudioStream] = useState<MediaStream | null>(null);
   
   // --- EFFETS ---
   const [isChromaActive, setIsChromaActive] = useState(false);
@@ -85,6 +89,7 @@ export default function App() {
   const previewMonitorRef = useRef<HTMLVideoElement>(null);
   const [isProgramViewOpen, setIsProgramViewOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingVideoStreamRef = useRef<MediaStream | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
   const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
   const chromaAnimationRef = useRef<number | null>(null);
@@ -96,6 +101,10 @@ export default function App() {
         setObsStatus(status);
         if (message) setObsMessage(message);
         else if (status === 'connecting') setObsMessage('Connexion à OBS…');
+        if (status === 'disconnected') {
+          setIsLive(false);
+          setLiveMessage('Connexion OBS fermée.');
+        }
       },
       (sceneName) => setObsCurrentScene(sceneName)
     );
@@ -136,6 +145,11 @@ export default function App() {
     });
     if (connected) {
       await refreshObsScenes();
+      try {
+        setIsLive(await getObsStreamActive());
+      } catch {
+        setIsLive(false);
+      }
     } else {
       setObsCurrentScene('');
       setObsScenes([]);
@@ -548,30 +562,107 @@ export default function App() {
     if (joystickMode === 'zoom') setProgramZoom(1);
   };
 
-  // --- ENREGISTREMENT & LIVE ---
+  // --- ENREGISTREMENT PGM VIDÉO + AUDIO STÉRÉO ---
   const toggleRecording = () => {
     if (isRecording) {
-      if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    } else if (programCanvasRef.current) {
-      const stream = programCanvasRef.current.captureStream(30);
-      const recorder = new MediaRecorder(stream);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      return;
+    }
+
+    if (!programCanvasRef.current) {
+      setRecordingMessage('Canvas PGM indisponible.');
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setRecordingMessage('MediaRecorder non pris en charge sur cet appareil.');
+      return;
+    }
+
+    let videoStream: MediaStream | null = null;
+    try {
+      videoStream = programCanvasRef.current.captureStream(30);
+      recordingVideoStreamRef.current = videoStream;
+      const audioTracks = programAudioStream?.getAudioTracks() || [];
+      const recordingStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...audioTracks
+      ]);
+      const mimeType = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+      ].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = mimeType
+        ? new MediaRecorder(recordingStream, { mimeType })
+        : new MediaRecorder(recordingStream);
+
       mediaRecorderRef.current = recorder;
       recordedChunks.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.current.push(e.data); };
-      recorder.onstop = () => {
-        const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `video_${Date.now()}.webm`;
-        a.click();
+      setRecordingMessage(audioTracks.length ? 'REC · PGM vidéo + audio stéréo' : 'REC · vidéo seule (moteur audio non activé)');
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordedChunks.current.push(event.data);
       };
-      recorder.start();
+      recorder.onerror = () => {
+        setRecordingMessage('Erreur MediaRecorder pendant la capture.');
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunks.current, { type: recorder.mimeType || 'video/webm' });
+        if (blob.size > 0) {
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.download = `DSK-MV_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+          anchor.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+          setRecordingMessage('Enregistrement terminé · fichier WebM téléchargé.');
+        } else {
+          setRecordingMessage('Enregistrement vide : aucune donnée reçue.');
+        }
+        recordingVideoStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recordingVideoStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+      };
+      recorder.start(1000);
       setIsRecording(true);
+    } catch (error) {
+      videoStream?.getTracks().forEach((track) => track.stop());
+      recordingVideoStreamRef.current = null;
+      setIsRecording(false);
+      setRecordingMessage(error instanceof Error ? error.message : 'Impossible de démarrer l’enregistrement.');
     }
   };
 
-  const toggleLive = () => setIsLive(!isLive);
+  // LIVE pilote le moteur de diffusion OBS lorsqu’il est connecté.
+  const toggleLive = async () => {
+    if (obsStatus !== 'connected') {
+      setLiveMessage('Connectez d’abord DSK à OBS dans les réglages.');
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    setIsLiveBusy(true);
+    setLiveMessage('');
+    try {
+      const streamActive = await getObsStreamActive();
+      if (streamActive) {
+        await stopObsStream();
+        setIsLive(false);
+        setLiveMessage('Diffusion OBS arrêtée.');
+      } else {
+        await startObsStream();
+        const confirmed = await getObsStreamActive();
+        setIsLive(confirmed);
+        setLiveMessage(confirmed ? 'Diffusion OBS active.' : 'OBS n’a pas confirmé le démarrage du direct.');
+      }
+    } catch (error) {
+      setLiveMessage(error instanceof Error ? error.message : 'Commande LIVE OBS impossible.');
+    } finally {
+      setIsLiveBusy(false);
+    }
+  };
 
   return (
     <div className="h-[100dvh] w-[100dvw] bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden relative">
@@ -583,12 +674,13 @@ export default function App() {
           <h1 className="text-sm font-black tracking-widest uppercase leading-none">DSK - MV</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={toggleRecording} className={`px-2 py-1 rounded text-[10px] font-bold ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800 text-slate-400'}`}>
-             {isRecording ? 'REC' : 'REC OFF'}
+          <button onClick={toggleRecording} className={`px-2 py-1 rounded text-[10px] font-bold ${isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800 text-slate-400'}`} title={recordingMessage || 'Enregistrer la sortie PGM'}>
+             {isRecording ? 'REC ●' : 'REC OFF'}
           </button>
-          <button onClick={toggleLive} className={`px-2 py-1 rounded text-[10px] font-bold ${isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-slate-800 text-slate-400'}`}>
-            {isLive ? 'LIVE' : 'OFFLINE'}
+          <button onClick={() => void toggleLive()} disabled={isLiveBusy} className={`px-2 py-1 rounded text-[10px] font-bold disabled:opacity-50 ${isLive ? 'bg-red-600 text-white animate-pulse' : obsStatus === 'connected' ? 'bg-slate-800 text-slate-300' : 'bg-slate-800 text-slate-500'}`} title={liveMessage || 'Démarrer ou arrêter le direct via OBS'}>
+            {isLiveBusy ? 'LIVE…' : isLive ? 'LIVE ON' : obsStatus === 'connected' ? 'LIVE OFF' : 'LIVE · OBS'}
           </button>
+          {(recordingMessage || liveMessage) && <span className="max-w-[180px] truncate text-[8px] text-slate-400" title={recordingMessage || liveMessage}>{recordingMessage || liveMessage}</span>}
           <button onClick={() => setIsProgramViewOpen(true)} className="p-1 text-red-500"><MonitorPlay size={18} /></button>
           <button onClick={() => setIsSettingsOpen(true)} className="p-1 text-slate-400"><Settings size={18} /></button>
         </div>
@@ -766,7 +858,7 @@ export default function App() {
               )}
               <div className="flex gap-2">
                 <button onClick={handleObsConnect} disabled={obsStatus === 'connecting'} className="flex-1 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">CONNECTER</button>
-                <button onClick={() => { void disconnectObs(); setObsScenes([]); setObsCurrentScene(''); setObsActionMessage(''); }} disabled={obsStatus !== 'connected'} className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">DÉCONNECTER</button>
+                <button onClick={() => { void disconnectObs(); setIsLive(false); setObsScenes([]); setObsCurrentScene(''); setObsActionMessage(''); }} disabled={obsStatus !== 'connected'} className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold">DÉCONNECTER</button>
               </div>
               <p className="text-[9px] text-slate-500 mt-2">OBS Studio doit être ouvert, avec le serveur WebSocket activé (port par défaut : 4455).</p>
             </div>
@@ -888,7 +980,7 @@ export default function App() {
         </div>
       )}
 
-      <AudioMixerPanel open={isAudioPanelOpen} onClose={() => setIsAudioPanelOpen(false)} />
+      <AudioMixerPanel open={isAudioPanelOpen} onClose={() => setIsAudioPanelOpen(false)} onProgramStreamChange={setProgramAudioStream} />
 
       {isDskPanelOpen && (
         <DskPanel
