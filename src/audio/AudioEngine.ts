@@ -122,7 +122,10 @@ export class AudioEngine {
       }));
   }
 
-  async requestInputStream(deviceId?: string): Promise<MediaStream> {
+  async requestInputStream(deviceId?: string, requestedChannels = 2): Promise<MediaStream> {
+    if (!Number.isInteger(requestedChannels) || requestedChannels < 1 || requestedChannels > MAX_AUDIO_CHANNEL_COUNT) {
+      throw new RangeError(`requestedChannels must be between 1 and ${MAX_AUDIO_CHANNEL_COUNT}`);
+    }
     this.assertActive();
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('Audio capture is not available in this Android/WebView context.');
@@ -130,8 +133,8 @@ export class AudioEngine {
 
     return navigator.mediaDevices.getUserMedia({
       audio: deviceId
-        ? { deviceId: { exact: deviceId }, channelCount: { ideal: 2 }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-        : { channelCount: { ideal: 2 }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        ? { deviceId: { exact: deviceId }, channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        : { channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       video: false
     });
   }
@@ -146,14 +149,72 @@ export class AudioEngine {
 
     this.disconnectInput(channelId);
     const source = this.context.createMediaStreamSource(stream);
-    channel.source = source;
+    channel.source = { node: source, outputIndex: 0 };
     source.connect(channel.inputGain);
+  }
+
+  /**
+   * Splits one multichannel capture stream into independent mono mixer channels.
+   * Returns the number of discrete channels actually exposed by the captured track.
+   */
+  connectMultichannelInput(startChannelId: number, stream: MediaStream, requestedChannels: number): number {
+    this.assertActive();
+    if (!Number.isInteger(requestedChannels) || requestedChannels < 1) {
+      throw new RangeError('requestedChannels must be a positive integer.');
+    }
+
+    const firstChannel = this.getChannel(startChannelId);
+    const availableChannels = this.channels.size - startChannelId + 1;
+    if (requestedChannels > availableChannels) {
+      throw new RangeError(`Only ${availableChannels} mixer channel(s) remain from CH ${startChannelId}.`);
+    }
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) throw new Error('The selected USB stream contains no audio track.');
+
+    const reportedChannels = audioTrack.getSettings().channelCount;
+    const actualChannels = Math.max(1, Math.min(
+      requestedChannels,
+      Number.isInteger(reportedChannels) && reportedChannels! > 0 ? reportedChannels! : requestedChannels
+    ));
+
+    if (actualChannels > availableChannels) {
+      throw new RangeError('The captured interface exposes more channels than the available mixer inputs.');
+    }
+
+    const source = this.context.createMediaStreamSource(stream);
+    const splitter = this.context.createChannelSplitter(actualChannels);
+    source.connect(splitter);
+
+    const connected: number[] = [];
+    try {
+      for (let offset = 0; offset < actualChannels; offset += 1) {
+        const channelId = startChannelId + offset;
+        const channel = this.getChannel(channelId);
+        this.disconnectInput(channelId);
+        splitter.connect(channel.inputGain, offset, 0);
+        channel.source = { node: splitter, outputIndex: offset };
+        connected.push(channelId);
+      }
+    } catch (error) {
+      for (const channelId of connected) this.disconnectInput(channelId);
+      source.disconnect();
+      splitter.disconnect();
+      throw error;
+    }
+
+    // Retain the source node through the splitter graph; the caller owns stream tracks.
+    return connected.length;
   }
 
   disconnectInput(channelId: number): void {
     const channel = this.getChannel(channelId);
     if (!channel.source) return;
-    channel.source.disconnect();
+    try {
+      channel.source.node.disconnect(channel.source.outputIndex, channel.inputGain, 0);
+    } catch {
+      // The route may already have been disconnected during stream replacement.
+    }
     channel.source = null;
   }
 
@@ -218,7 +279,13 @@ export class AudioEngine {
     this.disposed = true;
 
     for (const channel of this.channels.values()) {
-      channel.source?.disconnect();
+      if (channel.source) {
+        try {
+          channel.source.node.disconnect(channel.source.outputIndex, channel.inputGain, 0);
+        } catch {
+          // Ignore routes already disconnected.
+        }
+      }
       channel.inputGain.disconnect();
       channel.preFaderAnalyser.disconnect();
       channel.channelGain.disconnect();
@@ -318,7 +385,7 @@ type ChannelGraph = {
   analyser: AnalyserNode;
   isoPreDestination: MediaStreamAudioDestinationNode;
   isoPostDestination: MediaStreamAudioDestinationNode;
-  source: MediaStreamAudioSourceNode | null;
+  source: { node: AudioNode; outputIndex: number } | null;
   gain: number;
   pan: number;
   muted: boolean;
