@@ -46,7 +46,7 @@ export class AudioLanTransport {
     this.onStatus = onStatus;
   }
 
-  async connect(host: string, port: number, streams: AudioTransportStream[]): Promise<void> {
+  async connect(host: string, port: number, token: string, streams: AudioTransportStream[]): Promise<void> {
     await this.disconnect();
     this.stopped = false;
 
@@ -54,6 +54,7 @@ export class AudioLanTransport {
     if (!cleanHost || /[/?#]/.test(cleanHost)) {
       throw new Error('Saisissez une adresse IP ou un nom d’hôte du PC Receiver, sans chemin.');
     }
+    if (token.trim().length < 16) throw new Error('Le code d’association du Receiver doit contenir au moins 16 caractères.');
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error('Le port du Receiver doit être compris entre 1 et 65535.');
     }
@@ -69,7 +70,7 @@ export class AudioLanTransport {
         throw new Error(`Le flux ${streamId.toUpperCase()} doit exposer exactement une piste audio.`);
       }
 
-      this.openSession(cleanHost, port, streamId, mediaStream);
+      this.openSession(cleanHost, port, token.trim(), streamId, mediaStream);
     }
   }
 
@@ -91,8 +92,8 @@ export class AudioLanTransport {
     }
   }
 
-  private openSession(host: string, port: number, streamId: string, mediaStream: MediaStream): void {
-    const socket = new WebSocket(`ws://${host}:${port}/signal?role=sender&stream=${streamId}`);
+  private openSession(host: string, port: number, token: string, streamId: string, mediaStream: MediaStream): void {
+    const socket = new WebSocket(`ws://${host}:${port}/signal?role=sender&stream=${streamId}&token=${encodeURIComponent(token)}`);
     const peer = new RTCPeerConnection({ iceServers: [] });
     const session = { socket, peer, streamId };
     const pendingRemoteCandidates: RTCIceCandidateInit[] = [];
