@@ -20,6 +20,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
   const transportRef = useRef<AudioLanTransport | null>(null);
   const [host, setHost] = useState('');
   const [port, setPort] = useState('8765');
+  const [token, setToken] = useState('');
   const [statuses, setStatuses] = useState<Record<string, AudioTransportStatus['state']>>({});
   const [messages, setMessages] = useState<string[]>([]);
   const [tapPoint, setTapPoint] = useState<'pre-fader' | 'post-fader'>('post-fader');
@@ -56,7 +57,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
         (channelId, point) => engine.getChannelOutput(channelId, point).stream,
         tapPoint
       );
-      await transport.connect(host, parsedPort, streams);
+      await transport.connect(host, parsedPort, token, streams);
       setMessages(['Négociation WebRTC lancée pour le PGM et les 8 pistes ISO.']);
     } catch (error) {
       await transport.disconnect();
@@ -87,7 +88,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
         <span className="rounded bg-slate-800 px-2 py-1 text-[9px] text-slate-300">{activeCount}/9 flux actifs</span>
       </div>
 
-      <div className="grid grid-cols-[1fr_90px_auto] gap-2">
+      <div className="grid grid-cols-[1fr_1fr_90px_auto] gap-2">
         <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
           <span>IP DU PC DSK AUDIO RECEIVER</span>
           <input value={host} onChange={(event) => setHost(event.target.value)} disabled={isConnected || connecting} placeholder="192.168.1.100" className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-xs text-white" />
@@ -96,10 +97,15 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
           <span>PORT</span>
           <input value={port} onChange={(event) => setPort(event.target.value)} disabled={isConnected || connecting} inputMode="numeric" className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-xs text-white" />
         </label>
+        <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
+          <span>CODE D’ASSOCIATION</span>
+          <input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} disabled={isConnected || connecting} placeholder="Code affiché sur le PC" className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-xs text-white" />
+        </label>
+
         {isConnected ? (
           <button onClick={() => void disconnect()} className="self-end rounded bg-red-800 px-3 py-2 text-[9px] font-bold text-white">ARRÊTER</button>
         ) : (
-          <button onClick={() => void connect()} disabled={!enabled || connecting || !host.trim()} className="self-end rounded bg-sky-700 px-3 py-2 text-[9px] font-bold text-white disabled:opacity-40">{connecting ? 'LANCEMENT…' : 'CONNECTER'}</button>
+          <button onClick={() => void connect()} disabled={!enabled || connecting || !host.trim() || token.trim().length < 16} className="self-end rounded bg-sky-700 px-3 py-2 text-[9px] font-bold text-white disabled:opacity-40">{connecting ? 'LANCEMENT…' : 'CONNECTER'}</button>
         )}
       </div>
 
@@ -128,7 +134,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
       </div>
 
       {messages.map((message, index) => <p key={index} role="status" className="text-[9px] text-amber-200">{message}</p>)}
-      <p className="text-[9px] text-slate-500">Le PC doit exécuter DSK Audio Receiver et autoriser le port choisi dans son pare-feu. Chaque URL OBS recevra un seul flux audio.</p>
+      <p className="text-[9px] text-slate-500">Le PC doit exécuter DSK Audio Receiver. Récupérez son code d’association sur la page locale du Receiver. Chaque URL OBS recevra un seul flux audio.</p>
     </section>
   );
 }
