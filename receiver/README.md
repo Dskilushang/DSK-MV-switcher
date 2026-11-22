@@ -57,14 +57,10 @@ The `/obs/...` pages are restricted to loopback access and are intended to be op
 
 The signaling server also reserves seven independent video rooms: `cam-2` through `cam-8`. The DSK mixer connects as the receiver for these rooms. Each phone camera connects as a sender; video media travels directly over WebRTC on the local network, while the PC relays only SDP/ICE signaling.
 
-On a phone, open the camera sender page at:
+The separate native Android companion is in `camera-companion/` (application ID `com.dskmv.camera`, display name **DSK Camera**). The CI workflow builds a dedicated APK artifact named `dsk-camera-android-debug`, separate from the DSK-MV Switcher APK.
 
-```text
-http://<PC-LAN-IP>:8765/camera
-```
+On each phone, install and open DSK Camera, enter the PC LAN address, port 8765 and pairing code, select an unused source CAM 2–CAM 8, choose front or rear camera, then start transmission. In DSK-MV Switcher, enter the same PC address, port and pairing code in DSK VIDEO and connect CAM 2–8. A phone must use a different CAM number from every other connected phone.
 
-Choose an unused camera number (CAM 2–CAM 8), enter the pairing code, select the front or rear camera, and start the feed. In DSK-MV Switcher, open Settings > DSK VIDEO, enter the same PC address, port and pairing code, then connect CAM 2–8. A phone must use a different CAM number from every other connected phone.
-
-**Important Android/browser limitation:** camera capture through `getUserMedia()` requires a secure context. A plain HTTP page opened through a LAN IP is not a secure context in modern browsers, so Android may block camera permission even when the user grants it. The page explicitly detects this and refuses to pretend the camera is running. For a production deployment, serve the sender through trusted HTTPS or package it as the native **DSK Camera** Android companion app. The native companion packaging and real-device permission flow are not included in this first signaling/receiver increment.
+The older `/camera` browser page remains available for diagnostics, but plain HTTP through a LAN IP is not a secure context in modern browsers and may block `getUserMedia()`. Use the native DSK Camera app for the intended phone-camera workflow. The Android runtime permission flow and actual camera transmission still require final real-device validation.
 
 The seven video rooms use peer-to-peer WebRTC with no STUN/TURN service configured. This is intended for devices on the same Wi-Fi/LAN. Network isolation, client isolation, firewall rules, codec negotiation and sustained multi-camera bandwidth still require end-to-end testing.
