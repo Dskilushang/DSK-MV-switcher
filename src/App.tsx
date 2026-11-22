@@ -32,6 +32,8 @@ export default function App() {
   const [transitionSpeed, setTransitionSpeed] = useState(1000);
   const [programZoom, setProgramZoom] = useState(1);
   const [tBarProgress, setTBarProgress] = useState(0);
+  const [isAutoTransitioning, setIsAutoTransitioning] = useState(false);
+  const autoTransitionFrameRef = useRef<number | null>(null);
   const [logoPos, setLogoPos] = useState({ x: 50, y: 10 });
   // 'zoom' ou 'logo'. Contrôle le mode du joystick
   const [joystickMode, setJoystickMode] = useState<'zoom' | 'logo'>('zoom'); 
@@ -357,13 +359,52 @@ export default function App() {
   }, [isProgramViewOpen]);
 
   // --- TRANSITIONS ---
+  // CUT / fin de T-Bar : bascule immédiate PGM ↔ PVW.
   const handleTransition = () => {
     if (isFrozen) return;
-    const temp = programChannel;
     setProgramChannel(previewChannel);
-    setPreviewChannel(temp);
+    setPreviewChannel(programChannel);
     setTBarProgress(0);
   };
+
+  // AUTO : fondu progressif piloté par la durée réglée au joystick.
+  const handleAutoTransition = () => {
+    if (isFrozen || isAutoTransitioning) return;
+    if (autoTransitionFrameRef.current !== null) {
+      cancelAnimationFrame(autoTransitionFrameRef.current);
+    }
+
+    setIsAutoTransitioning(true);
+    const duration = Math.max(300, Math.min(3000, transitionSpeed));
+    let startedAt: number | null = null;
+
+    const animate = (timestamp: number) => {
+      if (startedAt === null) startedAt = timestamp;
+      const progress = Math.min(1, (timestamp - startedAt) / duration);
+      setTBarProgress(progress);
+
+      if (progress >= 1) {
+        autoTransitionFrameRef.current = null;
+        setTBarProgress(0);
+        setProgramChannel(previewChannel);
+        setPreviewChannel(programChannel);
+        setIsAutoTransitioning(false);
+        return;
+      }
+
+      autoTransitionFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    autoTransitionFrameRef.current = requestAnimationFrame(animate);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (autoTransitionFrameRef.current !== null) {
+        cancelAnimationFrame(autoTransitionFrameRef.current);
+      }
+    };
+  }, []);
 
   // --- JOYSTICK ---
   const handleJoystickMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -475,7 +516,7 @@ export default function App() {
             const isP = programChannel === channel;
             const isV = previewChannel === channel;
             return (
-              <div key={channel} onClick={() => !isFrozen && setPreviewChannel(channel)} className={`relative bg-slate-900 rounded border-2 ${isP ? 'border-red-500' : isV ? 'border-green-500' : 'border-slate-800'} overflow-hidden cursor-pointer pointer-events-auto`}>
+              <div key={channel} onClick={() => !isFrozen && !isAutoTransitioning && setPreviewChannel(channel)} className={`relative bg-slate-900 rounded border-2 ${isP ? 'border-red-500' : isV ? 'border-green-500' : 'border-slate-800'} overflow-hidden cursor-pointer pointer-events-auto`}>
                 {channel === 1 ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
                     {cameraStream ? <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /> : <div className="z-20 flex flex-col items-center gap-1 px-1"><button onClick={(event) => { event.stopPropagation(); void startCamera(); }} disabled={cameraStatus === 'requesting'} className="bg-red-600 disabled:bg-slate-600 text-white px-2 py-1 rounded text-[10px] pointer-events-auto">{cameraStatus === 'requesting' ? 'Activation…' : 'Activer'}</button>{cameraError && <span role="alert" className="max-w-full text-center text-[8px] leading-tight text-red-300">{cameraError}</span>}</div>}
@@ -497,11 +538,12 @@ export default function App() {
         <div className="w-20 bg-slate-900 border-l border-slate-800 flex flex-col items-center py-2 justify-between shrink-0">
           <div className="flex-1 flex items-center justify-center w-full">
             {/* T-BAR TOUJOURS ACTIVE */}
-            <TBar onTransition={handleTransition} onProgress={(progress) => setTBarProgress(progress)} />
+            <TBar onTransition={handleTransition} onProgress={(progress) => setTBarProgress(progress)} disabled={isFrozen || isAutoTransitioning} />
           </div>
           <div className="flex flex-col w-full px-1 gap-1">
-            <button onClick={handleTransition} className="w-full bg-slate-700 text-white py-2 rounded font-black text-xs border-b-2 border-slate-900 active:border-b-0">CUT</button>
-            <button onClick={handleTransition} className="w-full bg-blue-600 text-white py-2 rounded font-black text-xs border-b-2 border-blue-800 active:border-b-0">AUTO</button>
+            <button onClick={handleTransition} disabled={isFrozen || isAutoTransitioning} className="w-full bg-slate-700 disabled:opacity-40 text-white py-2 rounded font-black text-xs border-b-2 border-slate-900 active:border-b-0">CUT</button>
+            <button onClick={handleAutoTransition} disabled={isFrozen || isAutoTransitioning} className="w-full bg-blue-600 disabled:opacity-40 text-white py-2 rounded font-black text-xs border-b-2 border-blue-800 active:border-b-0">{isAutoTransitioning ? 'AUTO…' : 'AUTO'}</button>
+            <span className="text-[8px] text-slate-400 text-center">{transitionSpeed} ms</span>
           </div>
         </div>
       </div>
@@ -543,8 +585,8 @@ export default function App() {
             return (
               <button 
                 key={ch} 
-                onClick={() => !isFrozen && setPreviewChannel(ch)} 
-                disabled={isFrozen} 
+                onClick={() => !isFrozen && !isAutoTransitioning && setPreviewChannel(ch)} 
+                disabled={isFrozen || isAutoTransitioning} 
                 className={`flex-1 min-w-0 h-10 rounded font-bold text-sm border-b-2 transition-all active:border-b-0 active:translate-y-0.5 touch-manipulation ${isP ? 'bg-red-600 border-red-800 text-white' : isV ? 'bg-green-600 border-green-800 text-white' : 'bg-slate-800 border-slate-900 text-slate-300'}`}
               >
                 {ch}
