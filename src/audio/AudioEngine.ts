@@ -211,7 +211,7 @@ export class AudioEngine {
     const channel = this.getChannel(channelId);
     if (!channel.source) return;
     try {
-      channel.source.node.disconnect(channel.source.outputIndex, channel.inputGain, 0);
+      channel.source.node.disconnect(channel.inputGain, channel.source.outputIndex, 0);
     } catch {
       // The route may already have been disconnected during stream replacement.
     }
@@ -281,7 +281,7 @@ export class AudioEngine {
     for (const channel of this.channels.values()) {
       if (channel.source) {
         try {
-          channel.source.node.disconnect(channel.source.outputIndex, channel.inputGain, 0);
+          channel.source.node.disconnect(channel.inputGain, channel.source.outputIndex, 0);
         } catch {
           // Ignore routes already disconnected.
         }
