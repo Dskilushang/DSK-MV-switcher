@@ -52,3 +52,19 @@ The `/obs/...` pages are restricted to loopback access and are intended to be op
 - The receiver does not expose virtual audio devices or install OBS plugins.
 - The sender and receiver signaling sessions require the generated pairing code. The code is displayed only on the local PC page and stored in an ignored local file. HTTP/WebSocket signaling is not encrypted; WebRTC media itself is protected by DTLS-SRTP. Use only on a trusted production LAN and restrict the signaling port with the firewall.
 - Browser-source audio capture and Android WebView WebSocket/WebRTC behavior require final end-to-end validation. This code is the first transport implementation, not a claim that the physical workflow has already passed testing.
+
+## DSK Video · remote phone cameras (CAM 2–8)
+
+The signaling server also reserves seven independent video rooms: `cam-2` through `cam-8`. The DSK mixer connects as the receiver for these rooms. Each phone camera connects as a sender; video media travels directly over WebRTC on the local network, while the PC relays only SDP/ICE signaling.
+
+On a phone, open the camera sender page at:
+
+```text
+http://<PC-LAN-IP>:8765/camera
+```
+
+Choose an unused camera number (CAM 2–CAM 8), enter the pairing code, select the front or rear camera, and start the feed. In DSK-MV Switcher, open Settings > DSK VIDEO, enter the same PC address, port and pairing code, then connect CAM 2–8. A phone must use a different CAM number from every other connected phone.
+
+**Important Android/browser limitation:** camera capture through `getUserMedia()` requires a secure context. A plain HTTP page opened through a LAN IP is not a secure context in modern browsers, so Android may block camera permission even when the user grants it. The page explicitly detects this and refuses to pretend the camera is running. For a production deployment, serve the sender through trusted HTTPS or package it as the native **DSK Camera** Android companion app. The native companion packaging and real-device permission flow are not included in this first signaling/receiver increment.
+
+The seven video rooms use peer-to-peer WebRTC with no STUN/TURN service configured. This is intended for devices on the same Wi-Fi/LAN. Network isolation, client isolation, firewall rules, codec negotiation and sustained multi-camera bandwidth still require end-to-end testing.
