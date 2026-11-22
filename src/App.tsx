@@ -74,6 +74,8 @@ export default function App() {
   const [streamUrl, setStreamUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
   const programCanvasRef = useRef<HTMLCanvasElement>(null);
   const programPreviewVideoRef = useRef<HTMLVideoElement>(null);
+  const programMonitorRef = useRef<HTMLVideoElement>(null);
+  const previewMonitorRef = useRef<HTMLVideoElement>(null);
   const [isProgramViewOpen, setIsProgramViewOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
@@ -349,6 +351,29 @@ export default function App() {
     return () => cancelAnimationFrame(frameId);
   }, [programChannel, previewChannel, remoteCameraStreams, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, dskLayers]);
 
+  // --- MONITEURS PGM / PVW ---
+  useEffect(() => {
+    const canvas = programCanvasRef.current;
+    const video = programMonitorRef.current;
+    if (!canvas || !video) return;
+    const stream = canvas.captureStream(30);
+    video.srcObject = stream;
+    void video.play().catch(() => undefined);
+    return () => {
+      video.srcObject = null;
+      stream.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    const video = previewMonitorRef.current;
+    if (!video) return;
+    const stream = previewChannel === 1 ? cameraStream : remoteCameraStreams[previewChannel] || null;
+    video.srcObject = stream;
+    if (stream) void video.play().catch(() => undefined);
+    else video.pause();
+  }, [previewChannel, cameraStream, remoteCameraStreams]);
+
   // --- PREVIEW DIRECT ---
   useEffect(() => {
     if (isProgramViewOpen && programCanvasRef.current && programPreviewVideoRef.current) {
@@ -511,7 +536,18 @@ export default function App() {
         </div>
 
         {/* CENTRE : MultiView */}
-        <main className="flex-1 bg-black p-1 grid grid-cols-4 grid-rows-2 gap-1 overflow-hidden">
+        <main className="flex-1 bg-black p-1 flex flex-col gap-1 overflow-hidden">
+          <div className="h-[34%] min-h-0 grid grid-cols-2 gap-1">
+            <div className="relative min-w-0 min-h-0 bg-slate-950 border border-red-600 rounded overflow-hidden">
+              <video ref={programMonitorRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain" />
+              <span className="absolute top-1 left-1 bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PGM · PROGRAM</span>
+            </div>
+            <div className="relative min-w-0 min-h-0 bg-slate-950 border border-emerald-600 rounded overflow-hidden">
+              <video ref={previewMonitorRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain" />
+              <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PVW · PREVIEW</span>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 grid grid-cols-4 grid-rows-2 gap-1 overflow-hidden">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => {
             const isP = programChannel === channel;
             const isV = previewChannel === channel;
@@ -532,6 +568,7 @@ export default function App() {
               </div>
             );
           })}
+          </div>
         </main>
 
         {/* DROITE : T-Bar & Transitions */}
