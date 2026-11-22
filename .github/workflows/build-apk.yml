@@ -60,7 +60,7 @@ jobs:
           if "android.hardware.camera.any" not in source:
               additions.append('    <uses-feature android:name="android.hardware.camera.any" android:required="true" />')
           if additions:
-              source = source[:opening.end()] + "\\n" + "\\n".join(additions) + source[opening.end():]
+              source = source[:opening.end()] + "\n" + "\n".join(additions) + source[opening.end():]
           root = ET.fromstring(source)
           ns = "{http://schemas.android.com/apk/res/android}"
           permissions = [node.attrib.get(ns + "name") for node in root.findall("uses-permission")]
