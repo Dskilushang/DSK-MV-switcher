@@ -246,7 +246,10 @@ export default function App() {
       : remoteVideoRefs.current[programChannel];
     const canvas = chromaCanvasRef.current;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!video || !ctx) return;
+    if (!video || !ctx) {
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
 
     let cancelled = false;
     let lastProcessedAt = 0;
