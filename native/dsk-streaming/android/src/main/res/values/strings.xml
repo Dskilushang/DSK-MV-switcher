@@ -1,0 +1,3 @@
+<resources>
+    <string name="dsk_streaming_service_description">Maintains an active DSK-MV live streaming session.</string>
+</resources>
