@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ChangeEvent } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { DskStreaming } from '@dsk-mv/native-streaming';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
@@ -769,7 +771,7 @@ export default function App() {
     setCameraReceiverMessage('Profil chargé. Vérifiez le code d’association puis reconnectez les caméras.');
   };
 
-  // LIVE pilote le moteur de diffusion OBS lorsqu’il est connecté.
+  // LIVE pilote OBS et, sur Android natif, le service de maintien en arrière-plan.
   const toggleLive = async () => {
     if (obsStatus !== 'connected') {
       setLiveMessage('Connectez d’abord DSK à OBS dans les réglages.');
@@ -777,19 +779,47 @@ export default function App() {
       return;
     }
 
+    const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
     setIsLiveBusy(true);
     setLiveMessage('');
     try {
       const streamActive = await getObsStreamActive();
       if (streamActive) {
         await stopObsStream();
+        if (isAndroid) {
+          await DskStreaming.stopBackgroundService();
+        }
         setIsLive(false);
         setLiveMessage('Diffusion OBS arrêtée.');
       } else {
-        await startObsStream();
-        const confirmed = await getObsStreamActive();
-        setIsLive(confirmed);
-        setLiveMessage(confirmed ? 'Diffusion OBS active.' : 'OBS n’a pas confirmé le démarrage du direct.');
+        if (isAndroid) {
+          await DskStreaming.startBackgroundService({
+            title: 'DSK-MV — LIVE actif',
+            text: 'Maintien de la session OBS en arrière-plan'
+          });
+        }
+
+        try {
+          await startObsStream();
+          const confirmed = await getObsStreamActive();
+          setIsLive(confirmed);
+          if (confirmed) {
+            setLiveMessage('Diffusion OBS active.');
+          } else {
+            if (isAndroid) await DskStreaming.stopBackgroundService();
+            setLiveMessage('OBS n’a pas confirmé le démarrage du direct.');
+          }
+        } catch (error) {
+          if (isAndroid) {
+            try {
+              await DskStreaming.stopBackgroundService();
+            } catch {
+              setLiveMessage('Échec du démarrage OBS ; le service Android doit être arrêté manuellement.');
+              return;
+            }
+          }
+          throw error;
+        }
       }
     } catch (error) {
       setLiveMessage(error instanceof Error ? error.message : 'Commande LIVE OBS impossible.');
