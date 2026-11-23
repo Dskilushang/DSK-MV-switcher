@@ -15,6 +15,7 @@ buildscript {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 android {
     namespace 'com.dskmv.streaming'
@@ -33,4 +34,5 @@ repositories {
 
 dependencies {
     implementation project(':capacitor-android')
+    implementation 'androidx.core:core-ktx:1.13.1'
 }
