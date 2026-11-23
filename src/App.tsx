@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ChangeEvent } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { DskStreaming } from '@dsk-mv/native-streaming';
 import { Settings, Radio, MonitorPlay, Zap, Move, X } from 'lucide-react';
 import TBar from './TBar';
 import DskPanel, { type DskLayer } from './DskPanel';
@@ -116,6 +118,7 @@ export default function App() {
     { id: 4, name: 'GRAPHIQUE', type: 'image', content: '', enabled: false, x: 65, y: 68, opacity: 1, fontSize: 24 }
   ]);
   const dskImageCacheRef = useRef<Record<number, { src: string; image: HTMLImageElement }>>({});
+  const logoImageCacheRef = useRef<{ src: string; image: HTMLImageElement } | null>(null);
   const [isFrozen, setIsFrozen] = useState(false);
 
   // --- JOYSTICK & T-BAR ---
@@ -397,135 +400,153 @@ export default function App() {
 
   // --- MOTEUR DU CANVAS (GÈRE LE FREEZE, LE FONDU ET LE LOGO) ---
   useEffect(() => {
-    let frameId: number;
+    let frameId: number | null = null;
+    let timerId: number | null = null;
     const canvas = programCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Si on est en freeze, on arrête la boucle pour figer l'image
+    // Si on est en freeze, on arrête la boucle pour figer l'image.
     if (isFrozen) return;
 
+    // Cadence fixe : évite d'exécuter une callback RAF à chaque rafraîchissement
+    // écran (60/90/120 Hz) alors que le PGM ne doit être recomposé qu'à 30 FPS.
+    const targetFrameInterval = 1000 / 30;
     const draw = () => {
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      ctx.save();
-      const zoomWidth = canvas.width / programZoom;
-      const zoomHeight = canvas.height / programZoom;
-      const offsetX = (canvas.width - zoomWidth) / 2;
-      const offsetY = (canvas.height - zoomHeight) / 2;
-      ctx.translate(-offsetX, -offsetY);
-
-      const drawSource = (ch: number, opacity: number) => {
-        ctx.globalAlpha = opacity;
-        const sourceVideo = ch === 9 ? mediaVideoRef.current : ch === 1 ? localVideoRef.current : remoteVideoRefs.current[ch];
-        if (
-          isChromaActive &&
-          ch === programChannel &&
-          chromaCanvasRef.current &&
-          chromaCanvasRef.current.width > 0
-        ) {
-          ctx.drawImage(chromaCanvasRef.current, 0, 0, canvas.width, canvas.height);
-        } else if (sourceVideo && sourceVideo.readyState >= 2) {
-          ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
-        }
-        ctx.globalAlpha = 1.0;
-      };
-
-      if (tBarProgressRef.current > 0) {
-        drawSource(programChannel, 1);
-        drawSource(previewChannel, tBarProgressRef.current);
-      } else {
-        drawSource(programChannel, 1);
-      }
-      ctx.restore();
-
-      // PIP : seconde source vidéo composée dans le programme.
-      if (isPipActive && pipSourceChannel !== programChannel) {
-        const pipVideo = pipSourceChannel === 9
-          ? mediaVideoRef.current
-          : pipSourceChannel === 1
-            ? localVideoRef.current
-            : remoteVideoRefs.current[pipSourceChannel];
-        if (pipVideo && pipVideo.readyState >= 2 && pipVideo.videoWidth > 0) {
-          const aspect = pipVideo.videoWidth / pipVideo.videoHeight;
-          let pipWidth = canvas.width * pipScale;
-          let pipHeight = pipWidth / aspect;
-          const maxHeight = canvas.height * 0.42;
-          if (pipHeight > maxHeight) {
-            pipHeight = maxHeight;
-            pipWidth = pipHeight * aspect;
-          }
-          const margin = Math.round(canvas.width * 0.025);
-          const x = pipPosition.endsWith('right') ? canvas.width - pipWidth - margin : margin;
-          const y = pipPosition.startsWith('bottom') ? canvas.height - pipHeight - margin : margin;
-          ctx.save();
-          ctx.shadowColor = 'rgba(0,0,0,0.65)';
-          ctx.shadowBlur = 18;
-          ctx.fillStyle = '#020617';
-          ctx.fillRect(x - 5, y - 5, pipWidth + 10, pipHeight + 10);
-          ctx.shadowBlur = 0;
-          ctx.drawImage(pipVideo, x, y, pipWidth, pipHeight);
-          ctx.strokeStyle = '#f8fafc';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(x, y, pipWidth, pipHeight);
-          ctx.restore();
-        }
-      }
-
-      if (isLogoActive && customLogo) {
-        const logoImg = new Image();
-        logoImg.src = customLogo;
-        if (logoImg.complete && logoImg.naturalWidth > 0) {
-          const lWidth = 120;
-          const lHeight = (logoImg.height / logoImg.width) * lWidth;
-          const posX = (logoPos.x / 100) * canvas.width;
-          const posY = (logoPos.y / 100) * canvas.height;
-          ctx.drawImage(logoImg, posX, posY, lWidth, lHeight);
-        }
-      }
-
-      // DSK: four independent downstream graphic layers, composited over the program.
-      dskLayers.forEach((layer) => {
-        if (!layer.enabled || !layer.content.trim()) return;
-        const x = (layer.x / 100) * canvas.width;
-        const y = (layer.y / 100) * canvas.height;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
         ctx.save();
-        ctx.globalAlpha = layer.opacity;
-        if (layer.type === 'text') {
-          ctx.font = `700 ${layer.fontSize}px Arial, sans-serif`;
-          ctx.textBaseline = 'top';
-          ctx.fillStyle = '#ffffff';
-          ctx.shadowColor = 'rgba(0,0,0,0.85)';
-          ctx.shadowBlur = 5;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-          ctx.fillText(layer.content.slice(0, 120), x, y, canvas.width * 0.9);
+        const zoomWidth = canvas.width / programZoom;
+        const zoomHeight = canvas.height / programZoom;
+        const offsetX = (canvas.width - zoomWidth) / 2;
+        const offsetY = (canvas.height - zoomHeight) / 2;
+        ctx.translate(-offsetX, -offsetY);
+
+        const drawSource = (ch: number, opacity: number) => {
+          ctx.globalAlpha = opacity;
+          const sourceVideo = ch === 9 ? mediaVideoRef.current : ch === 1 ? localVideoRef.current : remoteVideoRefs.current[ch];
+          if (
+            isChromaActive &&
+            ch === programChannel &&
+            chromaCanvasRef.current &&
+            chromaCanvasRef.current.width > 0
+          ) {
+            ctx.drawImage(chromaCanvasRef.current, 0, 0, canvas.width, canvas.height);
+          } else if (sourceVideo && sourceVideo.readyState >= 2) {
+            ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
+          }
+          ctx.globalAlpha = 1.0;
+        };
+
+        if (tBarProgressRef.current > 0) {
+          drawSource(programChannel, 1);
+          drawSource(previewChannel, tBarProgressRef.current);
         } else {
-          let cached = dskImageCacheRef.current[layer.id];
-          if (!cached || cached.src !== layer.content) {
-            const image = new Image();
-            image.src = layer.content;
-            cached = { src: layer.content, image };
-            dskImageCacheRef.current[layer.id] = cached;
-          }
-          const image = cached.image;
-          if (image.complete && image.naturalWidth > 0) {
-            const maxWidth = canvas.width * 0.28;
-            const maxHeight = canvas.height * 0.24;
-            const scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight, 1);
-            const width = image.naturalWidth * scale;
-            const height = image.naturalHeight * scale;
-            ctx.drawImage(image, x, y, width, height);
-          }
+          drawSource(programChannel, 1);
         }
         ctx.restore();
-      });
-      frameId = requestAnimationFrame(draw);
+
+        // PIP : seconde source vidéo composée dans le programme.
+        if (isPipActive && pipSourceChannel !== programChannel) {
+          const pipVideo = pipSourceChannel === 9
+            ? mediaVideoRef.current
+            : pipSourceChannel === 1
+              ? localVideoRef.current
+              : remoteVideoRefs.current[pipSourceChannel];
+          if (pipVideo && pipVideo.readyState >= 2 && pipVideo.videoWidth > 0) {
+            const aspect = pipVideo.videoWidth / pipVideo.videoHeight;
+            let pipWidth = canvas.width * pipScale;
+            let pipHeight = pipWidth / aspect;
+            const maxHeight = canvas.height * 0.42;
+            if (pipHeight > maxHeight) {
+              pipHeight = maxHeight;
+              pipWidth = pipHeight * aspect;
+            }
+            const margin = Math.round(canvas.width * 0.025);
+            const x = pipPosition.endsWith('right') ? canvas.width - pipWidth - margin : margin;
+            const y = pipPosition.startsWith('bottom') ? canvas.height - pipHeight - margin : margin;
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.65)';
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(x - 5, y - 5, pipWidth + 10, pipHeight + 10);
+            ctx.shadowBlur = 0;
+            ctx.drawImage(pipVideo, x, y, pipWidth, pipHeight);
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x, y, pipWidth, pipHeight);
+            ctx.restore();
+          }
+        }
+
+        if (isLogoActive && customLogo) {
+          // Reuse the same image object across frames instead of allocating a new
+          // HTMLImageElement on every animation frame.
+          let logoCache = logoImageCacheRef.current;
+          if (!logoCache || logoCache.src !== customLogo) {
+            const image = new Image();
+            image.src = customLogo;
+            logoCache = { src: customLogo, image };
+            logoImageCacheRef.current = logoCache;
+          }
+          const logoImg = logoCache.image;
+          if (logoImg.complete && logoImg.naturalWidth > 0) {
+            const lWidth = 120;
+            const lHeight = (logoImg.height / logoImg.width) * lWidth;
+            const posX = (logoPos.x / 100) * canvas.width;
+            const posY = (logoPos.y / 100) * canvas.height;
+            ctx.drawImage(logoImg, posX, posY, lWidth, lHeight);
+          }
+        }
+
+        // DSK: four independent downstream graphic layers, composited over the program.
+        dskLayers.forEach((layer) => {
+          if (!layer.enabled || !layer.content.trim()) return;
+          const x = (layer.x / 100) * canvas.width;
+          const y = (layer.y / 100) * canvas.height;
+          ctx.save();
+          ctx.globalAlpha = layer.opacity;
+          if (layer.type === 'text') {
+            ctx.font = `700 ${layer.fontSize}px Arial, sans-serif`;
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0,0,0,0.85)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.fillText(layer.content.slice(0, 120), x, y, canvas.width * 0.9);
+          } else {
+            let cached = dskImageCacheRef.current[layer.id];
+            if (!cached || cached.src !== layer.content) {
+              const image = new Image();
+              image.src = layer.content;
+              cached = { src: layer.content, image };
+              dskImageCacheRef.current[layer.id] = cached;
+            }
+            const image = cached.image;
+            if (image.complete && image.naturalWidth > 0) {
+              const maxWidth = canvas.width * 0.28;
+              const maxHeight = canvas.height * 0.24;
+              const scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight, 1);
+              const width = image.naturalWidth * scale;
+              const height = image.naturalHeight * scale;
+              ctx.drawImage(image, x, y, width, height);
+            }
+          }
+          ctx.restore();
+        });
+
+      timerId = window.setTimeout(() => {
+        frameId = requestAnimationFrame(draw);
+      }, targetFrameInterval);
     };
-    draw();
-    return () => cancelAnimationFrame(frameId);
+    frameId = requestAnimationFrame(draw);
+    return () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
   }, [programChannel, previewChannel, remoteCameraStreams, mediaUrl, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
 
   // --- MONITEURS PGM / PVW ---
@@ -558,11 +579,21 @@ export default function App() {
 
   // --- PREVIEW DIRECT ---
   useEffect(() => {
-    if (isProgramViewOpen && programCanvasRef.current && programPreviewVideoRef.current) {
-      const stream = programCanvasRef.current.captureStream(30);
-      programPreviewVideoRef.current.srcObject = stream;
-      programPreviewVideoRef.current.play().catch(e => console.log(e));
-    }
+    if (!isProgramViewOpen) return;
+
+    const canvas = programCanvasRef.current;
+    const video = programPreviewVideoRef.current;
+    if (!canvas || !video) return;
+
+    const stream = canvas.captureStream(30);
+    video.srcObject = stream;
+    void video.play().catch((error) => console.log(error));
+
+    return () => {
+      video.pause();
+      video.srcObject = null;
+      stream.getTracks().forEach((track) => track.stop());
+    };
   }, [isProgramViewOpen]);
 
   // --- TRANSITIONS ---
@@ -740,7 +771,7 @@ export default function App() {
     setCameraReceiverMessage('Profil chargé. Vérifiez le code d’association puis reconnectez les caméras.');
   };
 
-  // LIVE pilote le moteur de diffusion OBS lorsqu’il est connecté.
+  // LIVE pilote OBS et, sur Android natif, le service de maintien en arrière-plan.
   const toggleLive = async () => {
     if (obsStatus !== 'connected') {
       setLiveMessage('Connectez d’abord DSK à OBS dans les réglages.');
@@ -748,6 +779,7 @@ export default function App() {
       return;
     }
 
+    const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
     setIsLiveBusy(true);
     setLiveMessage('');
     try {
@@ -755,12 +787,39 @@ export default function App() {
       if (streamActive) {
         await stopObsStream();
         setIsLive(false);
+        if (isAndroid) {
+          await DskStreaming.stopBackgroundService();
+        }
         setLiveMessage('Diffusion OBS arrêtée.');
       } else {
-        await startObsStream();
-        const confirmed = await getObsStreamActive();
-        setIsLive(confirmed);
-        setLiveMessage(confirmed ? 'Diffusion OBS active.' : 'OBS n’a pas confirmé le démarrage du direct.');
+        if (isAndroid) {
+          await DskStreaming.startBackgroundService({
+            title: 'DSK-MV — LIVE actif',
+            text: 'Maintien de la session OBS en arrière-plan'
+          });
+        }
+
+        try {
+          await startObsStream();
+          const confirmed = await getObsStreamActive();
+          setIsLive(confirmed);
+          if (confirmed) {
+            setLiveMessage('Diffusion OBS active.');
+          } else {
+            if (isAndroid) await DskStreaming.stopBackgroundService();
+            setLiveMessage('OBS n’a pas confirmé le démarrage du direct.');
+          }
+        } catch (error) {
+          if (isAndroid) {
+            try {
+              await DskStreaming.stopBackgroundService();
+            } catch {
+              setLiveMessage('Échec du démarrage OBS ; le service Android doit être arrêté manuellement.');
+              return;
+            }
+          }
+          throw error;
+        }
       }
     } catch (error) {
       setLiveMessage(error instanceof Error ? error.message : 'Commande LIVE OBS impossible.');

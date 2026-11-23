@@ -1,0 +1,16 @@
+{
+  "name": "@dsk-mv/native-streaming",
+  "version": "0.1.0",
+  "description": "Capacitor Android foreground service foundation for DSK-MV streaming.",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": ["src", "android"],
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^6.0.0"
+  }
+}

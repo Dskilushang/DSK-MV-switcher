@@ -31,7 +31,7 @@ jobs:
           java-version: 17
 
       - name: Installer les dépendances DSK Camera
-        run: npm install
+        run: npm ci
 
       - name: Vérifier TypeScript et compiler DSK Camera
         run: npm run build
@@ -102,7 +102,7 @@ jobs:
           java-version: 17
 
       - name: Installer les dépendances
-        run: npm install
+        run: npm ci
 
       - name: Vérifier les types TypeScript
         run: npx tsc --noEmit
