@@ -51,7 +51,7 @@ jobs:
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           source = manifest.read_text(encoding="utf-8")
-          opening = re.search(r"<manifest\\b[^>]*>", source)
+          opening = re.search(r"<manifest\b[^>]*>", source)
           if opening is None:
               raise SystemExit("Balise manifest introuvable")
           additions = []
@@ -60,7 +60,7 @@ jobs:
           if "android.hardware.camera.any" not in source:
               additions.append('    <uses-feature android:name="android.hardware.camera.any" android:required="true" />')
           if additions:
-              source = source[:opening.end()] + "\\n" + "\\n".join(additions) + source[opening.end():]
+              source = source[:opening.end()] + "\n" + "\n".join(additions) + source[opening.end():]
           root = ET.fromstring(source)
           ns = "{http://schemas.android.com/apk/res/android}"
           permissions = [node.attrib.get(ns + "name") for node in root.findall("uses-permission")]
@@ -131,7 +131,7 @@ jobs:
               raise SystemExit(f"Manifeste Android introuvable : {manifest}")
 
           source = manifest.read_text(encoding="utf-8")
-          manifest_opening = re.search(r"<manifest\\b[^>]*>", source, re.DOTALL)
+          manifest_opening = re.search(r"<manifest\b[^>]*>", source, re.DOTALL)
           if manifest_opening is None:
               raise SystemExit("Balise manifest introuvable")
 
@@ -144,12 +144,12 @@ jobs:
           ]
           if missing_permissions:
               permission_xml = "".join(
-                  f'\\n    <uses-permission android:name="{permission}" />'
+                  f'\n    <uses-permission android:name="{permission}" />'
                   for permission in missing_permissions
               )
               insert_at = manifest_opening.end()
               source = source[:insert_at] + permission_xml + source[insert_at:]
-          activity_pattern = re.compile(r"<activity\\b[^>]*>.*?</activity>", re.DOTALL)
+          activity_pattern = re.compile(r"<activity\b[^>]*>.*?</activity>", re.DOTALL)
           matches = list(activity_pattern.finditer(source))
           launchers = [
               match for match in matches
@@ -160,11 +160,11 @@ jobs:
               raise SystemExit(f"Une seule Activity MAIN/LAUNCHER attendue, trouvé : {len(launchers)}")
 
           match = launchers[0]
-          opening = re.search(r"<activity\\b[^>]*>", match.group(0), re.DOTALL)
+          opening = re.search(r"<activity\b[^>]*>", match.group(0), re.DOTALL)
           if opening is None:
               raise SystemExit("Balise Activity principale introuvable")
 
-          tag = re.sub(r'\\s+android:screenOrientation="[^"]*"', "", opening.group(0))
+          tag = re.sub(r'\s+android:screenOrientation="[^"]*"', "", opening.group(0))
           tag = tag[:-1] + ' android:screenOrientation="landscape">'
           updated_activity = match.group(0)[:opening.start()] + tag + match.group(0)[opening.end():]
           updated = source[:match.start()] + updated_activity + source[match.end():]
