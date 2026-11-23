@@ -1,0 +1,36 @@
+ext {
+    minSdkVersion = rootProject.ext.minSdkVersion
+    compileSdkVersion = rootProject.ext.compileSdkVersion
+    targetSdkVersion = rootProject.ext.targetSdkVersion
+}
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.1'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'com.dskmv.streaming'
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+}
