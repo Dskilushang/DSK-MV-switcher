@@ -786,10 +786,10 @@ export default function App() {
       const streamActive = await getObsStreamActive();
       if (streamActive) {
         await stopObsStream();
+        setIsLive(false);
         if (isAndroid) {
           await DskStreaming.stopBackgroundService();
         }
-        setIsLive(false);
         setLiveMessage('Diffusion OBS arrêtée.');
       } else {
         if (isAndroid) {
