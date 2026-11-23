@@ -163,6 +163,46 @@ export default function App() {
   const [isLoadingObsScenes, setIsLoadingObsScenes] = useState(false);
   const [obsActionMessage, setObsActionMessage] = useState('');
 
+  // --- DIAGNOSTIC ENCODEUR VIDÉO NATIF ANDROID ---
+  const [isH264ProbeRunning, setIsH264ProbeRunning] = useState(false);
+  const [h264ProbeMessage, setH264ProbeMessage] = useState('');
+  const [h264ProbeResult, setH264ProbeResult] = useState<{
+    supported: boolean;
+    codecName: string | null;
+    hardwareAccelerated: boolean;
+    width: number;
+    height: number;
+    frameRate: number;
+    inputSurfaceCreated: boolean;
+    detail: string | null;
+  } | null>(null);
+
+  const runH264EncoderProbe = async () => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
+      setH264ProbeMessage('Ce diagnostic est disponible uniquement dans l’application Android.');
+      return;
+    }
+    setIsH264ProbeRunning(true);
+    setH264ProbeMessage('Analyse des encodeurs H.264 de cet appareil…');
+    setH264ProbeResult(null);
+    try {
+      const result = await DskStreaming.probeH264SurfaceEncoder({
+        width: 1280,
+        height: 720,
+        frameRate: 30,
+        bitRate: 4_000_000
+      });
+      setH264ProbeResult(result);
+      setH264ProbeMessage(result.supported
+        ? 'Encodeur H.264 configuré avec succès.'
+        : 'Aucun encodeur compatible n’a pu être configuré.');
+    } catch (error) {
+      setH264ProbeMessage(error instanceof Error ? error.message : 'Diagnostic H.264 impossible.');
+    } finally {
+      setIsH264ProbeRunning(false);
+    }
+  };
+
   // --- CANVAS & LIVE ---
   const [streamKey, setStreamKey] = useState('');
   const [streamUrl, setStreamUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
@@ -1063,6 +1103,32 @@ export default function App() {
               </div>
               <p className="text-[9px] text-slate-500 mt-2">OBS Studio doit être ouvert, avec le serveur WebSocket activé (port par défaut : 4455).</p>
             </div>
+
+            {Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && (
+              <div className="mb-4 bg-slate-900 p-3 rounded border border-slate-700 space-y-2">
+                <p className="text-xs font-bold text-amber-300">DIAGNOSTIC VIDÉO NATIF ANDROID</p>
+                <p className="text-[10px] text-slate-400">Vérifie si l’appareil peut préparer un encodeur H.264 matériel en 1280 × 720 à 30 images/s. Ce test ne démarre aucune caméra et aucune diffusion.</p>
+                <button
+                  onClick={() => void runH264EncoderProbe()}
+                  disabled={isH264ProbeRunning}
+                  className="w-full bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold"
+                >
+                  {isH264ProbeRunning ? 'ANALYSE…' : 'TESTER L’ENCODEUR H.264'}
+                </button>
+                {h264ProbeMessage && <p className="text-[10px] text-slate-300">{h264ProbeMessage}</p>}
+                {h264ProbeResult && (
+                  <div className="rounded bg-slate-800 p-2 space-y-1">
+                    <p className={`text-[10px] font-bold ${h264ProbeResult.supported ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {h264ProbeResult.supported ? 'COMPATIBLE' : 'NON COMPATIBLE'}
+                    </p>
+                    <p className="text-[10px] text-slate-300">Encodeur : {h264ProbeResult.codecName || 'Aucun'}</p>
+                    <p className="text-[10px] text-slate-300">Accélération matérielle : {h264ProbeResult.hardwareAccelerated ? 'Oui' : 'Non / non confirmée'}</p>
+                    <p className="text-[10px] text-slate-300">Surface d’entrée : {h264ProbeResult.inputSurfaceCreated ? 'Créée' : 'Non créée'}</p>
+                    <p className="text-[10px] text-slate-400">{h264ProbeResult.detail}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Import Logo Stylisé */}
             <div className="mb-4 bg-slate-900 p-3 rounded border border-slate-700">
