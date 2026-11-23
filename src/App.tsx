@@ -116,6 +116,7 @@ export default function App() {
     { id: 4, name: 'GRAPHIQUE', type: 'image', content: '', enabled: false, x: 65, y: 68, opacity: 1, fontSize: 24 }
   ]);
   const dskImageCacheRef = useRef<Record<number, { src: string; image: HTMLImageElement }>>({});
+  const logoImageCacheRef = useRef<{ src: string; image: HTMLImageElement } | null>(null);
   const [isFrozen, setIsFrozen] = useState(false);
 
   // --- JOYSTICK & T-BAR ---
@@ -475,8 +476,16 @@ export default function App() {
       }
 
       if (isLogoActive && customLogo) {
-        const logoImg = new Image();
-        logoImg.src = customLogo;
+        // Reuse the same image object across frames instead of allocating a new
+        // HTMLImageElement on every animation frame.
+        let logoCache = logoImageCacheRef.current;
+        if (!logoCache || logoCache.src !== customLogo) {
+          const image = new Image();
+          image.src = customLogo;
+          logoCache = { src: customLogo, image };
+          logoImageCacheRef.current = logoCache;
+        }
+        const logoImg = logoCache.image;
         if (logoImg.complete && logoImg.naturalWidth > 0) {
           const lWidth = 120;
           const lHeight = (logoImg.height / logoImg.width) * lWidth;
