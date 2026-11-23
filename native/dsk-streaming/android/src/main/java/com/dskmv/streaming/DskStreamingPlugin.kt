@@ -45,4 +45,42 @@ class DskStreamingPlugin : Plugin() {
     fun getBackgroundServiceStatus(call: PluginCall) {
         call.resolve(JSObject().put("running", DskStreamingService.isRunning))
     }
+
+    /**
+     * Checks H.264 Surface-input encoder availability without starting a stream.
+     * The probe runs off the UI thread because codec discovery/configuration can block.
+     */
+    @PluginMethod
+    fun probeH264SurfaceEncoder(call: PluginCall) {
+        val width = call.getInt("width") ?: 1280
+        val height = call.getInt("height") ?: 720
+        val frameRate = call.getInt("frameRate") ?: 30
+        val bitRate = call.getInt("bitRate") ?: 4_000_000
+
+        if (width !in 320..3840 || height !in 240..2160 ||
+            frameRate !in 1..60 || bitRate !in 100_000..30_000_000
+        ) {
+            call.reject("Paramètres encodeur hors limites.")
+            return
+        }
+
+        Thread({
+            try {
+                val result = DskVideoEncoderProbe.run(width, height, frameRate, bitRate)
+                val response = JSObject().apply {
+                    put("supported", result.supported)
+                    put("codecName", result.codecName)
+                    put("hardwareAccelerated", result.hardwareAccelerated)
+                    put("width", result.width)
+                    put("height", result.height)
+                    put("frameRate", result.frameRate)
+                    put("inputSurfaceCreated", result.inputSurfaceCreated)
+                    put("detail", result.detail)
+                }
+                call.resolve(response)
+            } catch (error: Exception) {
+                call.reject("Échec du diagnostic de l'encodeur H.264.", error)
+            }
+        }, "DSK-H264-Encoder-Probe").start()
+    }
 }
