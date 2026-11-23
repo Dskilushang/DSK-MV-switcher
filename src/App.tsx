@@ -577,11 +577,21 @@ export default function App() {
 
   // --- PREVIEW DIRECT ---
   useEffect(() => {
-    if (isProgramViewOpen && programCanvasRef.current && programPreviewVideoRef.current) {
-      const stream = programCanvasRef.current.captureStream(30);
-      programPreviewVideoRef.current.srcObject = stream;
-      programPreviewVideoRef.current.play().catch(e => console.log(e));
-    }
+    if (!isProgramViewOpen) return;
+
+    const canvas = programCanvasRef.current;
+    const video = programPreviewVideoRef.current;
+    if (!canvas || !video) return;
+
+    const stream = canvas.captureStream(30);
+    video.srcObject = stream;
+    void video.play().catch((error) => console.log(error));
+
+    return () => {
+      video.pause();
+      video.srcObject = null;
+      stream.getTracks().forEach((track) => track.stop());
+    };
   }, [isProgramViewOpen]);
 
   // --- TRANSITIONS ---
