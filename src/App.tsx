@@ -398,20 +398,20 @@ export default function App() {
 
   // --- MOTEUR DU CANVAS (GÈRE LE FREEZE, LE FONDU ET LE LOGO) ---
   useEffect(() => {
-    let frameId: number;
+    let frameId: number | null = null;
+    let timerId: number | null = null;
     const canvas = programCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Si on est en freeze, on arrête la boucle pour figer l'image
+    // Si on est en freeze, on arrête la boucle pour figer l'image.
     if (isFrozen) return;
 
+    // Cadence fixe : évite d'exécuter une callback RAF à chaque rafraîchissement
+    // écran (60/90/120 Hz) alors que le PGM ne doit être recomposé qu'à 30 FPS.
     const targetFrameInterval = 1000 / 30;
-    let lastDrawTime = 0;
-    const draw = (timestamp: number) => {
-      if (timestamp - lastDrawTime >= targetFrameInterval) {
-        lastDrawTime = timestamp;
+    const draw = () => {
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
@@ -536,11 +536,15 @@ export default function App() {
           ctx.restore();
         });
 
-      }
-      frameId = requestAnimationFrame(draw);
+      timerId = window.setTimeout(() => {
+        frameId = requestAnimationFrame(draw);
+      }, targetFrameInterval);
     };
     frameId = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frameId);
+    return () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
   }, [programChannel, previewChannel, remoteCameraStreams, mediaUrl, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
 
   // --- MONITEURS PGM / PVW ---
