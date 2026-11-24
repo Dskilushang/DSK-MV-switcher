@@ -28,16 +28,35 @@ function meterWidth(value: number): number {
 function Meter({ reading }: { reading: AudioMeterReading }) {
   return (
     <div className="space-y-1">
-      <div className="h-2 overflow-hidden rounded bg-slate-950 border border-slate-700">
+      <div className="h-1.5 overflow-hidden rounded bg-slate-950 border border-slate-700">
         <div
           className="h-full bg-emerald-500 transition-[width] duration-100"
           style={{ width: `${meterWidth(reading.rmsDb)}%` }}
         />
       </div>
-      <div className="flex justify-between text-[9px] tabular-nums text-slate-400">
+      <div className="flex justify-between text-[8px] tabular-nums text-slate-400">
         <span>{formatDb(reading.rmsDb)}</span>
         <span>PK {formatDb(reading.peakDb)}</span>
       </div>
+    </div>
+  );
+}
+
+function VerticalMeter({ reading }: { reading: AudioMeterReading }) {
+  return (
+    <div
+      className="flex min-h-0 w-3 flex-col items-center justify-end overflow-hidden rounded border border-slate-700 bg-slate-950"
+      role="meter"
+      aria-label={`Niveau audio : RMS ${formatDb(reading.rmsDb)}, peak ${formatDb(reading.peakDb)}`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={meterWidth(reading.rmsDb)}
+      title={`RMS ${formatDb(reading.rmsDb)} · Peak ${formatDb(reading.peakDb)}`}
+    >
+      <div
+        className="mt-auto w-full bg-emerald-500 transition-[height] duration-100"
+        style={{ height: `${meterWidth(reading.rmsDb)}%` }}
+      />
     </div>
   );
 }
@@ -383,7 +402,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
             const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
-              <article key={channelId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
+              <article key={channelId} className="grid min-w-0 grid-cols-[minmax(0,1fr)_12px] items-stretch gap-1 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
+                <div className="flex min-w-0 flex-col gap-2">
                 <div className="flex items-center justify-between gap-1">
                   <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
                   <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
@@ -419,8 +439,6 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                     {busyChannel === channelId ? 'CONNEXION…' : 'CONNECTER'}
                   </button>
                 )}
-
-                <Meter reading={channel?.meter || { rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY }} />
 
                 <label className="space-y-1 text-[9px] text-slate-400">
                   <span className="flex justify-between"><span>GAIN</span><span>{Math.round((channel?.gain ?? 1) * 100)}%</span></span>
@@ -459,6 +477,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                 >
                   {channel?.muted ? 'MUTED' : 'MUTE'}
                 </button>
+                </div>
+                <VerticalMeter reading={channel?.meter || { rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY }} />
               </article>
             );
           })}
