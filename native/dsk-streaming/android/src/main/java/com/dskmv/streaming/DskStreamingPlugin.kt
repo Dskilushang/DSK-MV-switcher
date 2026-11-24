@@ -75,6 +75,9 @@ class DskStreamingPlugin : Plugin() {
                     put("height", result.height)
                     put("frameRate", result.frameRate)
                     put("inputSurfaceCreated", result.inputSurfaceCreated)
+                    put("encodedFrameCount", result.encodedFrameCount)
+                    put("encodedBytes", result.encodedBytes)
+                    put("outputMimeType", result.outputMimeType)
                     put("detail", result.detail)
                 }
                 call.resolve(response)
