@@ -50,6 +50,9 @@ export class AudioEngine {
   private readonly mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
   private readonly masterGain: GainNode;
   private readonly masterAnalyser: AnalyserNode;
+  private readonly masterSplitter: ChannelSplitterNode;
+  private readonly masterLeftAnalyser: AnalyserNode;
+  private readonly masterRightAnalyser: AnalyserNode;
   private readonly programDestination: MediaStreamAudioDestinationNode;
   private disposed = false;
 
@@ -64,10 +67,18 @@ export class AudioEngine {
     this.masterGain = this.context.createGain();
     this.masterAnalyser = this.context.createAnalyser();
     this.masterAnalyser.fftSize = 2048;
+    this.masterSplitter = this.context.createChannelSplitter(2);
+    this.masterLeftAnalyser = this.context.createAnalyser();
+    this.masterRightAnalyser = this.context.createAnalyser();
+    this.masterLeftAnalyser.fftSize = 2048;
+    this.masterRightAnalyser.fftSize = 2048;
     this.programDestination = this.context.createMediaStreamDestination();
 
     this.masterGain.connect(this.masterAnalyser);
     this.masterAnalyser.connect(this.programDestination);
+    this.masterGain.connect(this.masterSplitter);
+    this.masterSplitter.connect(this.masterLeftAnalyser, 0);
+    this.masterSplitter.connect(this.masterRightAnalyser, 1);
 
     for (let id = 1; id <= channelCount; id += 1) {
       this.createChannel(id, `CH ${id}`);
@@ -284,6 +295,15 @@ export class AudioEngine {
     return this.readMeter(this.masterAnalyser);
   }
 
+  /** Independent post-master stereo meters for the left and right PGM channels. */
+  getMasterStereoMeters(): { left: AudioMeterReading; right: AudioMeterReading } {
+    this.assertActive();
+    return {
+      left: this.readMeter(this.masterLeftAnalyser),
+      right: this.readMeter(this.masterRightAnalyser)
+    };
+  }
+
   getAllChannelSnapshots(): AudioChannelSnapshot[] {
     return [...this.channels.keys()].sort((a, b) => a - b).map((id) => this.getChannelSnapshot(id));
   }
@@ -311,6 +331,9 @@ export class AudioEngine {
 
     this.masterGain.disconnect();
     this.masterAnalyser.disconnect();
+    this.masterSplitter.disconnect();
+    this.masterLeftAnalyser.disconnect();
+    this.masterRightAnalyser.disconnect();
     this.programDestination.disconnect();
 
     if (this.ownsContext && this.context.state !== 'closed') {
