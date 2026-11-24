@@ -174,6 +174,9 @@ export default function App() {
     height: number;
     frameRate: number;
     inputSurfaceCreated: boolean;
+    encodedFrameCount: number;
+    encodedBytes: number;
+    outputMimeType: string | null;
     detail: string | null;
   } | null>(null);
 
@@ -183,7 +186,7 @@ export default function App() {
       return;
     }
     setIsH264ProbeRunning(true);
-    setH264ProbeMessage('Analyse des encodeurs H.264 de cet appareil…');
+    setH264ProbeMessage('Test d’encodage H.264 réel en cours…');
     setH264ProbeResult(null);
     try {
       const result = await DskStreaming.probeH264SurfaceEncoder({
@@ -194,8 +197,8 @@ export default function App() {
       });
       setH264ProbeResult(result);
       setH264ProbeMessage(result.supported
-        ? 'Encodeur H.264 configuré avec succès.'
-        : 'Aucun encodeur compatible n’a pu être configuré.');
+        ? 'Test d’encodage H.264 terminé.'
+        : 'L’encodage H.264 réel n’a pas abouti.');
     } catch (error) {
       setH264ProbeMessage(error instanceof Error ? error.message : 'Diagnostic H.264 impossible.');
     } finally {
@@ -1107,13 +1110,13 @@ export default function App() {
             {Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && (
               <div className="mb-4 bg-slate-900 p-3 rounded border border-slate-700 space-y-2">
                 <p className="text-xs font-bold text-amber-300">DIAGNOSTIC VIDÉO NATIF ANDROID</p>
-                <p className="text-[10px] text-slate-400">Vérifie si l’appareil peut préparer un encodeur H.264 matériel en 1280 × 720 à 30 images/s. Ce test ne démarre aucune caméra et aucune diffusion.</p>
+                <p className="text-[10px] text-slate-400">Vérifie l’encodage réel de 12 images de test en H.264 à 1280 × 720 et 30 images/s. Aucune caméra ni diffusion n’est démarrée.</p>
                 <button
                   onClick={() => void runH264EncoderProbe()}
                   disabled={isH264ProbeRunning}
                   className="w-full bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white py-2 rounded text-xs font-bold"
                 >
-                  {isH264ProbeRunning ? 'ANALYSE…' : 'TESTER L’ENCODEUR H.264'}
+                  {isH264ProbeRunning ? 'ANALYSE…' : 'TESTER L’ENCODAGE H.264'}
                 </button>
                 {h264ProbeMessage && <p className="text-[10px] text-slate-300">{h264ProbeMessage}</p>}
                 {h264ProbeResult && (
@@ -1124,6 +1127,9 @@ export default function App() {
                     <p className="text-[10px] text-slate-300">Encodeur : {h264ProbeResult.codecName || 'Aucun'}</p>
                     <p className="text-[10px] text-slate-300">Accélération matérielle : {h264ProbeResult.hardwareAccelerated ? 'Oui' : 'Non / non confirmée'}</p>
                     <p className="text-[10px] text-slate-300">Surface d’entrée : {h264ProbeResult.inputSurfaceCreated ? 'Créée' : 'Non créée'}</p>
+                    <p className="text-[10px] text-slate-300">Images H.264 produites : {h264ProbeResult.encodedFrameCount}</p>
+                    <p className="text-[10px] text-slate-300">Données encodées : {h264ProbeResult.encodedBytes} octets</p>
+                    <p className="text-[10px] text-slate-300">Format de sortie : {h264ProbeResult.outputMimeType || 'Non détecté'}</p>
                     <p className="text-[10px] text-slate-400">{h264ProbeResult.detail}</p>
                   </div>
                 )}
