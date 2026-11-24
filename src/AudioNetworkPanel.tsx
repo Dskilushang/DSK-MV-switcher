@@ -79,15 +79,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
   const isConnected = activeCount > 0 || Object.keys(statuses).length > 0;
 
   return (
-    <section className="max-h-[38vh] shrink-0 overflow-y-auto overscroll-contain border-b border-slate-700 bg-slate-900/90 p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-[11px] font-black tracking-wider text-sky-300">DSK AUDIO · LIAISON PC / OBS</h3>
-          <p className="text-[9px] text-slate-400">PGM stéréo + 8 flux ISO indépendants · WebRTC sur réseau local</p>
-        </div>
-        <span className="rounded bg-slate-800 px-2 py-1 text-[9px] text-slate-300">{activeCount}/9 flux actifs</span>
-      </div>
-
+    <details className="shrink-0 border-b border-slate-700 bg-slate-900/90 px-3 py-2"><summary className="cursor-pointer list-none text-[10px] font-bold text-sky-300">LIAISON PC / OBS · {activeCount}/9 flux</summary><div className="max-h-[32vh] space-y-2 overflow-y-auto overscroll-contain pt-3">
       <div className="grid grid-cols-[1fr_1fr_90px_auto] gap-2">
         <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
           <span>IP DU PC DSK AUDIO RECEIVER</span>
@@ -134,7 +126,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
       </div>
 
       {messages.map((message, index) => <p key={index} role="status" className="text-[9px] text-amber-200">{message}</p>)}
-      <p className="text-[9px] text-slate-500">Le PC doit exécuter DSK Audio Receiver. Récupérez son code d’association sur la page locale du Receiver. Chaque URL OBS recevra un seul flux audio.</p>
-    </section>
+      <details className="text-[9px] text-slate-500"><summary className="cursor-pointer">Aide à la connexion</summary><p className="pt-2">Le PC doit exécuter DSK Audio Receiver. Récupérez son code d’association sur sa page locale. Chaque destination OBS reçoit un flux audio distinct.</p></details>
+    </div></details>
   );
 }
