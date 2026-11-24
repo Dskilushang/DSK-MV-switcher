@@ -296,8 +296,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
 
   return (
     <div className={open ? 'fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-2' : 'hidden'}>
-      <section className="flex max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
-        <header className="flex items-center justify-between border-b border-slate-700 bg-slate-950 px-3 py-2">
+      <section className="flex h-full max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-700 bg-slate-950 px-3 py-2">
           <div>
             <h2 className="text-sm font-black tracking-wider text-amber-400">DSK AUDIO · MIXER</h2>
             <p className="text-[10px] text-slate-400">{status}</p>
