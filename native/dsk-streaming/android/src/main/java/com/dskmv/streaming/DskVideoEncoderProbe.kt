@@ -80,11 +80,11 @@ internal object DskVideoEncoderProbe {
                     encodedBytes = output.bytes,
                     outputMimeType = output.mime,
                     detail = if (success) {
-                        "Encodage H.264 réel confirmé : \${output.frames} image(s), \${output.bytes} octet(s) produits. Images de test GPU ; aucune caméra utilisée."
+                        "Encodage H.264 réel confirmé : ${output.frames} image(s), ${output.bytes} octet(s) produits. Images de test GPU ; aucune caméra utilisée."
                     } else "Codec configuré, mais aucun échantillon vidéo H.264 récupéré."
                 )
             } catch (error: Exception) {
-                lastError = "\${candidate.name}: \${error.message ?: error.javaClass.simpleName}"
+                lastError = "${candidate.name}: ${error.message ?: error.javaClass.simpleName}"
             } finally {
                 try { renderer?.release() } catch (_: Exception) {}
                 try { if (started) codec?.stop() } catch (_: Exception) {}
