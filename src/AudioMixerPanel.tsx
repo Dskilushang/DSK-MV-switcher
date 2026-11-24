@@ -51,7 +51,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const [selectedDevices, setSelectedDevices] = useState<Record<number, string>>({});
   const [multiChannelDevice, setMultiChannelDevice] = useState('');
   const [multiChannelStart, setMultiChannelStart] = useState(1);
-  const [multiChannelCount, setMultiChannelCount] = useState(8);
+  const [multiChannelCount, setMultiChannelCount] = useState(1);
   const [multiChannelGroup, setMultiChannelGroup] = useState<{ stream: MediaStream; channelIds: number[] } | null>(null);
   const [channels, setChannels] = useState<AudioChannelSnapshot[]>([]);
   const [masterMeter, setMasterMeter] = useState<AudioMeterReading>({ rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY });
@@ -228,7 +228,10 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       refreshMeters();
       setStatus(`USB multicanal connecté · CH ${multiChannelStart} à CH ${multiChannelStart + actualCount - 1} · ${actualCount} canal(aux)`);
       if (actualCount < multiChannelCount) {
-        setError(`Le périphérique n’a exposé que ${actualCount} canal(aux) sur les ${multiChannelCount} demandés. Vérifiez son pilote et ses paramètres Android.`);
+        // Many phone microphones and default Android routes expose one mono channel.
+        // Keep the successfully connected input and reflect the real device capability.
+        setMultiChannelCount(actualCount);
+        setStatus(`USB connecté · ${actualCount} canal(aux) réellement disponible(s) (sur ${multiChannelCount} demandé(s))`);
       }
     } catch (cause) {
       stream?.getTracks().forEach((track) => track.stop());
