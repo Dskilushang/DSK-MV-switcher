@@ -144,7 +144,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const [multiChannelCount, setMultiChannelCount] = useState(1);
   const [multiChannelGroup, setMultiChannelGroup] = useState<{ stream: MediaStream; channelIds: number[] } | null>(null);
   const [channels, setChannels] = useState<AudioChannelSnapshot[]>([]);
-  const [masterMeter, setMasterMeter] = useState<AudioMeterReading>({ rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY });
+  const silentMeter: AudioMeterReading = { rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY };
+  const [masterStereoMeters, setMasterStereoMeters] = useState<{ left: AudioMeterReading; right: AudioMeterReading }>({ left: silentMeter, right: silentMeter });
   const [masterGain, setMasterGain] = useState(1);
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -155,7 +156,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     if (!engine) return;
     try {
       setChannels(engine.getAllChannelSnapshots());
-      setMasterMeter(engine.getMasterMeter());
+      setMasterStereoMeters(engine.getMasterStereoMeters());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
@@ -545,11 +546,21 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
             <aside className="flex h-full w-[156px] shrink-0 flex-col items-center gap-3 rounded-lg border border-amber-500/50 bg-slate-950 p-3">
               <div className="w-full text-center">
                 <strong className="block text-xs font-black tracking-wide text-amber-300">PGM MASTER</strong>
-                <span className="text-[10px] tabular-nums text-slate-400">{formatDb(masterMeter.rmsDb)}</span>
+                <span className="text-[10px] tabular-nums text-slate-400">L {formatDb(masterStereoMeters.left.rmsDb)} · R {formatDb(masterStereoMeters.right.rmsDb)}</span>
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-center gap-3">
-                <div className="flex h-full max-h-64 w-5 flex-col justify-end overflow-hidden rounded border border-slate-700 bg-black p-0.5" role="meter" aria-label={`Niveau PGM : RMS ${formatDb(masterMeter.rmsDb)}, peak ${formatDb(masterMeter.peakDb)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={meterWidth(masterMeter.rmsDb)}>
-                  <div className="w-full rounded-sm bg-emerald-500 transition-[height] duration-100" style={{ height: `${meterWidth(masterMeter.rmsDb)}%` }} />
+                <div className="flex h-full items-end gap-2">
+                  {([
+                    ['L', masterStereoMeters.left],
+                    ['R', masterStereoMeters.right]
+                  ] as const).map(([side, reading]) => (
+                    <div key={side} className="flex h-full items-center gap-1">
+                      <span className="text-[9px] font-bold text-slate-400">{side}</span>
+                      <div className="flex h-full max-h-64 w-4 flex-col justify-end overflow-hidden rounded border border-slate-700 bg-black p-0.5" role="meter" aria-label={`Niveau PGM ${side} : RMS ${formatDb(reading.rmsDb)}, peak ${formatDb(reading.peakDb)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={meterWidth(reading.rmsDb)}>
+                        <div className="w-full rounded-sm bg-emerald-500 transition-[height] duration-100" style={{ height: `${meterWidth(reading.rmsDb)}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <label className="flex h-full flex-col items-center justify-center gap-2 text-[9px] font-bold text-slate-300">
                   <span className="text-amber-300">{Math.round(masterGain * 100)}%</span>
