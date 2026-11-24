@@ -61,6 +61,77 @@ function VerticalMeter({ reading }: { reading: AudioMeterReading }) {
   );
 }
 
+type RotaryKnobProps = {
+  label: string; value: number; min: number; max: number; step?: number;
+  defaultValue: number; disabled?: boolean; colorClass?: string;
+  formatValue: (value: number) => string; onChange: (value: number) => void;
+};
+
+/** Rotary control operated by touch, mouse drag, wheel and keyboard. */
+function RotaryKnob({
+  label, value, min, max, step = 0.01, defaultValue, disabled = false,
+  colorClass = 'text-sky-400', formatValue, onChange
+}: RotaryKnobProps) {
+  const dragY = useRef<number | null>(null);
+  const normalized = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const angle = -135 + normalized * 270;
+  const adjust = (next: number) => {
+    const precision = Math.max(0, (String(step).split('.')[1] || '').length);
+    const bounded = Math.max(min, Math.min(max, next));
+    onChange(Number((Math.round((bounded - min) / step) * step + min).toFixed(precision)));
+  };
+
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-0.5 select-none">
+      <span className="text-[9px] font-bold tracking-wide text-slate-300">{label}</span>
+      <div
+        role="slider" tabIndex={disabled ? -1 : 0} aria-label={label}
+        aria-valuemin={min} aria-valuemax={max} aria-valuenow={value}
+        aria-valuetext={formatValue(value)} aria-disabled={disabled}
+        onPointerDown={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          dragY.current = event.clientY;
+        }}
+        onPointerMove={(event) => {
+          if (disabled || dragY.current === null) return;
+          const delta = dragY.current - event.clientY;
+          dragY.current = event.clientY;
+          if (delta !== 0) adjust(value + delta * ((max - min) / 180));
+        }}
+        onPointerUp={() => { dragY.current = null; }}
+        onPointerCancel={() => { dragY.current = null; }}
+        onWheel={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          adjust(value + (event.deltaY < 0 ? step : -step) * 5);
+        }}
+        onKeyDown={(event) => {
+          if (disabled) return;
+          if (event.key === 'ArrowUp' || event.key === 'ArrowRight') { event.preventDefault(); adjust(value + step); }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') { event.preventDefault(); adjust(value - step); }
+          if (event.key === 'Home') { event.preventDefault(); adjust(min); }
+          if (event.key === 'End') { event.preventDefault(); adjust(max); }
+        }}
+        onDoubleClick={() => { if (!disabled) onChange(defaultValue); }}
+        title="Glisser verticalement · molette · double-clic pour réinitialiser"
+        className={`relative flex h-12 w-12 touch-none items-center justify-center rounded-full border-2 border-slate-600 bg-gradient-to-br from-slate-500 via-slate-800 to-black shadow-[inset_0_2px_5px_rgba(255,255,255,0.18),0_3px_6px_rgba(0,0,0,0.55)] outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-ns-resize'}`}
+      >
+        <svg viewBox="0 0 48 48" className="h-full w-full" aria-hidden="true">
+          <circle cx="24" cy="24" r="17.5" fill="#171d26" stroke="#64748b" strokeWidth="1.2" />
+          <circle cx="24" cy="24" r="13.5" fill="#303946" stroke="#0b1018" strokeWidth="1" />
+          <g transform={`rotate(${angle} 24 24)`}>
+            <line x1="24" y1="24" x2="24" y2="8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className={colorClass} />
+          </g>
+          <circle cx="24" cy="24" r="3" fill="#94a3b8" />
+        </svg>
+      </div>
+      <span className="text-[9px] font-semibold tabular-nums text-white">{formatValue(value)}</span>
+    </div>
+  );
+}
+
 export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onMediaAudioRouteReady }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
@@ -440,35 +511,22 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   </button>
                 )}
 
-                <label className="space-y-1 text-[9px] text-slate-400">
-                  <span className="flex justify-between"><span>GAIN</span><span>{Math.round((channel?.gain ?? 1) * 100)}%</span></span>
-                  <input
-                    aria-label={`Gain canal ${channelId}`}
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.01"
-                    value={channel?.gain ?? 1}
-                    disabled={!engineReady}
-                    onChange={(event) => updateGain(channelId, Number(event.target.value))}
-                    className="w-full accent-amber-400"
+                <div className="grid grid-cols-2 gap-1 rounded-md border border-slate-700/80 bg-slate-950/50 px-1 py-2">
+                  <RotaryKnob
+                    label="GAIN" value={channel?.gain ?? 1} min={0} max={2} step={0.01}
+                    defaultValue={1} disabled={!engineReady} colorClass="text-rose-400"
+                    formatValue={(value) => `${Math.round(value * 100)}%`}
+                    onChange={(value) => updateGain(channelId, value)}
                   />
-                </label>
+                  <RotaryKnob
+                    label="PAN" value={channel?.pan ?? 0} min={-1} max={1} step={0.01}
+                    defaultValue={0} disabled={!engineReady} colorClass="text-sky-400"
+                    formatValue={(value) => value < -0.02 ? `L ${Math.round(Math.abs(value) * 100)}` : value > 0.02 ? `R ${Math.round(value * 100)}` : 'CENTRE'}
+                    onChange={(value) => updatePan(channelId, value)}
+                  />
+                </div>
 
-                <label className="space-y-1 text-[9px] text-slate-400">
-                  <span className="flex justify-between"><span>PAN</span><span>{(channel?.pan ?? 0) < -0.02 ? 'L' : (channel?.pan ?? 0) > 0.02 ? 'R' : 'C'}</span></span>
-                  <input
-                    aria-label={`Panoramique canal ${channelId}`}
-                    type="range"
-                    min="-1"
-                    max="1"
-                    step="0.01"
-                    value={channel?.pan ?? 0}
-                    disabled={!engineReady}
-                    onChange={(event) => updatePan(channelId, Number(event.target.value))}
-                    className="w-full accent-sky-400"
-                  />
-                </label>
+
 
                 <button
                   onClick={() => toggleMute(channelId, !(channel?.muted ?? false))}
