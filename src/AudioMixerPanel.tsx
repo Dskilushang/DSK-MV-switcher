@@ -466,14 +466,15 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
           )}
         </div></details>
 
-        <div className="grid min-h-0 flex-1 grid-cols-8 gap-1 overflow-x-auto overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain p-2">
+          <div className="flex h-full min-w-max items-stretch gap-2">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
             const isMediaChannel = mediaChannelsRef.current.has(channelId);
             const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
-              <article key={channelId} className="grid min-w-0 grid-cols-[minmax(0,1fr)_12px] items-stretch gap-1 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
+              <article key={channelId} className="grid h-full w-[148px] shrink-0 grid-cols-[minmax(0,1fr)_12px] items-stretch gap-1 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
                 <div className="flex min-w-0 flex-col gap-2">
                 <div className="flex items-center justify-between gap-1">
                   <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
@@ -540,32 +541,38 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
               </article>
             );
           })}
+
+            <aside className="flex h-full w-[156px] shrink-0 flex-col items-center gap-3 rounded-lg border border-amber-500/50 bg-slate-950 p-3">
+              <div className="w-full text-center">
+                <strong className="block text-xs font-black tracking-wide text-amber-300">PGM MASTER</strong>
+                <span className="text-[10px] tabular-nums text-slate-400">{formatDb(masterMeter.rmsDb)}</span>
+              </div>
+              <div className="flex min-h-0 flex-1 items-center justify-center gap-3">
+                <div className="flex h-full max-h-64 w-5 flex-col justify-end overflow-hidden rounded border border-slate-700 bg-black p-0.5" role="meter" aria-label={`Niveau PGM : RMS ${formatDb(masterMeter.rmsDb)}, peak ${formatDb(masterMeter.peakDb)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={meterWidth(masterMeter.rmsDb)}>
+                  <div className="w-full rounded-sm bg-emerald-500 transition-[height] duration-100" style={{ height: `${meterWidth(masterMeter.rmsDb)}%` }} />
+                </div>
+                <label className="flex h-full flex-col items-center justify-center gap-2 text-[9px] font-bold text-slate-300">
+                  <span className="text-amber-300">{Math.round(masterGain * 100)}%</span>
+                  <input
+                    aria-label="Fader vertical PGM master"
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.01"
+                    value={masterGain}
+                    disabled={!engineReady}
+                    onChange={(event) => updateMasterGain(Number(event.target.value))}
+                    className="h-44 w-8 accent-amber-400"
+                    style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+                  />
+                  <span>MASTER</span>
+                </label>
+              </div>
+              <span className="text-[9px] text-slate-500">SORTIE PGM</span>
+            </aside>
+          </div>
         </div>
 
-        <footer className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-3 border-t border-slate-700 bg-slate-950 px-3 py-2">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center justify-between text-[10px]">
-              <strong className="text-amber-300">PGM · STÉRÉO L/R</strong>
-              <span className="text-slate-400">MASTER · {formatDb(masterMeter.rmsDb)}</span>
-            </div>
-            <Meter reading={masterMeter} />
-            <label className="mt-2 flex max-w-sm items-center gap-2 text-[9px] text-slate-400">
-              <span className="shrink-0">MASTER {Math.round(masterGain * 100)}%</span>
-              <input
-                aria-label="Gain master PGM"
-                type="range"
-                min="0"
-                max="2"
-                step="0.01"
-                value={masterGain}
-                disabled={!engineReady}
-                onChange={(event) => updateMasterGain(Number(event.target.value))}
-                className="w-full accent-amber-400"
-              />
-            </label>
-          </div>
-
-        </footer>
       </section>
     </div>
   );
