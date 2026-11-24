@@ -79,7 +79,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
   const isConnected = activeCount > 0 || Object.keys(statuses).length > 0;
 
   return (
-    <section className="border-b border-slate-700 bg-slate-900/90 p-3 space-y-2">
+    <section className="max-h-[38vh] shrink-0 overflow-y-auto overscroll-contain border-b border-slate-700 bg-slate-900/90 p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="text-[11px] font-black tracking-wider text-sky-300">DSK AUDIO · LIAISON PC / OBS</h3>
