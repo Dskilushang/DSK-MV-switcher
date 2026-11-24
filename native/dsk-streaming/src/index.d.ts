@@ -25,7 +25,13 @@ export interface H264EncoderProbeResult {
   height: number;
   frameRate: number;
   inputSurfaceCreated: boolean;
-  /** Explains the probe result. This probe does not encode or transmit video. */
+  /** Number of encoded H.264 samples recovered from generated test frames. */
+  encodedFrameCount: number;
+  /** Total encoded output bytes recovered from the codec. */
+  encodedBytes: number;
+  /** Actual output MIME type reported by MediaCodec. */
+  outputMimeType: string | null;
+  /** Explains the probe result. Generated GPU frames are used; no camera or stream is started. */
   detail: string | null;
 }
 
