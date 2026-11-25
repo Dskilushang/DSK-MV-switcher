@@ -13,7 +13,7 @@ type AudioMixerPanelProps = {
   onProgramStreamChange?: (stream: MediaStream | null) => void;
   onConnectedInputsChange?: (count: number) => void;
   onMediaAudioRouteReady?: (route: MediaAudioRoute | null) => void;
-  cameraStream?: MediaStream | null;
+  cameraAudioStreams?: Record<number, MediaStream | null>;
 };
 
 const CHANNEL_COUNT = 8;
@@ -134,7 +134,7 @@ function RotaryKnob({
   );
 }
 
-export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onConnectedInputsChange, onMediaAudioRouteReady, cameraStream }: AudioMixerPanelProps) {
+export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onConnectedInputsChange, onMediaAudioRouteReady, cameraAudioStreams }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
   const mediaChannelsRef = useRef<Set<number>>(new Set());
@@ -282,8 +282,11 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     setBusyChannel(channelId);
     setError('');
     try {
-      const stream = deviceId === '__local_camera_audio__'
-        ? new MediaStream((cameraStream?.getAudioTracks() || []).filter((track) => track.readyState === 'live').map((track) => track.clone()))
+      const cameraMatch = /^__camera_audio_(\d+)__$/.exec(deviceId);
+      const cameraId = cameraMatch ? Number(cameraMatch[1]) : null;
+      const cameraSource = cameraId === null ? null : cameraAudioStreams?.[cameraId];
+      const stream = cameraId !== null
+        ? new MediaStream((cameraSource?.getAudioTracks() || []).filter((track) => track.readyState === 'live').map((track) => track.clone()))
         : await engine.requestInputStream(deviceId);
       if (stream.getAudioTracks().length === 0) {
         stream.getTracks().forEach((track) => track.stop());
@@ -514,7 +517,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   className="h-8 w-full min-w-0 rounded-md border border-slate-600 bg-slate-950 px-1.5 text-[9px] text-white disabled:opacity-50"
                 >
                   <option value="">Entrée audio…</option>
-                  {cameraStream?.getAudioTracks().some((track) => track.readyState === 'live') && <option value="__local_camera_audio__">CAM 1 · MICRO</option>}
+                  {Object.entries(cameraAudioStreams || {}).map(([id, stream]) => stream?.getAudioTracks().some((track) => track.readyState === 'live') ? <option key={`camera-audio-${id}`} value={`__camera_audio_${id}__`}>CAM {id} · MICRO</option> : null)}
                   {devices.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>{device.label}</option>
                   ))}
