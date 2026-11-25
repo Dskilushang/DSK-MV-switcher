@@ -80,7 +80,7 @@ export default function AudioNetworkPanel({ engine, enabled }: Props) {
 
   return (
     <details className="shrink-0 border-b border-slate-700 bg-slate-900/90 px-3 py-2"><summary className="cursor-pointer list-none text-[10px] font-bold text-sky-300">LIAISON PC / OBS · {activeCount}/9 flux</summary><div className="max-h-[32vh] space-y-2 overflow-y-auto overscroll-contain pt-3">
-      <div className="grid grid-cols-[1fr_1fr_90px_auto] gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_90px_auto]">
         <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
           <span>IP DU PC DSK AUDIO RECEIVER</span>
           <input value={host} onChange={(event) => setHost(event.target.value)} disabled={isConnected || connecting} placeholder="192.168.1.100" className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-xs text-white" />
