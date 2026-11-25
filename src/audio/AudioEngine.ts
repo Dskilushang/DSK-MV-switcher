@@ -97,6 +97,11 @@ export class AudioEngine {
     return this.channels.size;
   }
 
+  getConnectedChannelCount(): number {
+    this.assertActive();
+    return [...this.channels.values()].filter((channel) => channel.source !== null).length;
+  }
+
   getProgramStream(): MediaStream {
     this.assertActive();
     return this.programDestination.stream;
