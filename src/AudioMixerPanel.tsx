@@ -13,6 +13,7 @@ type AudioMixerPanelProps = {
   onProgramStreamChange?: (stream: MediaStream | null) => void;
   onConnectedInputsChange?: (count: number) => void;
   onMediaAudioRouteReady?: (route: MediaAudioRoute | null) => void;
+  cameraStream?: MediaStream | null;
 };
 
 const CHANNEL_COUNT = 8;
@@ -133,7 +134,7 @@ function RotaryKnob({
   );
 }
 
-export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onConnectedInputsChange, onMediaAudioRouteReady }: AudioMixerPanelProps) {
+export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onConnectedInputsChange, onMediaAudioRouteReady, cameraStream }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
   const mediaChannelsRef = useRef<Set<number>>(new Set());
@@ -281,7 +282,13 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     setBusyChannel(channelId);
     setError('');
     try {
-      const stream = await engine.requestInputStream(deviceId);
+      const stream = deviceId === '__local_camera_audio__'
+        ? new MediaStream((cameraStream?.getAudioTracks() || []).filter((track) => track.readyState === 'live').map((track) => track.clone()))
+        : await engine.requestInputStream(deviceId);
+      if (stream.getAudioTracks().length === 0) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error('Aucune piste microphone active. Réactivez CAM1 et autorisez le microphone Android.');
+      }
       const previous = streamsRef.current.get(channelId);
       engine.connectInput(channelId, stream);
       streamsRef.current.set(channelId, stream);
@@ -507,6 +514,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   className="h-8 w-full min-w-0 rounded-md border border-slate-600 bg-slate-950 px-1.5 text-[9px] text-white disabled:opacity-50"
                 >
                   <option value="">Entrée audio…</option>
+                  {cameraStream?.getAudioTracks().some((track) => track.readyState === 'live') && <option value="__local_camera_audio__">CAM 1 · MICRO</option>}
                   {devices.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>{device.label}</option>
                   ))}
