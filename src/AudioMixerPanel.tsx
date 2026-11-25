@@ -148,6 +148,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const silentMeter: AudioMeterReading = { rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY };
   const [masterStereoMeters, setMasterStereoMeters] = useState<{ left: AudioMeterReading; right: AudioMeterReading }>({ left: silentMeter, right: silentMeter });
   const [masterGain, setMasterGain] = useState(1);
+  const [localMonitorGain, setLocalMonitorGain] = useState(0.8);
+  const [localMonitorMuted, setLocalMonitorMuted] = useState(false);
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Moteur audio arrêté');
@@ -391,6 +393,18 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     refreshMeters();
   };
 
+  const updateLocalMonitorGain = (value: number) => {
+    engineRef.current?.setLocalMonitorGain(value);
+    setLocalMonitorGain(value);
+  };
+
+  const toggleLocalMonitorMute = () => {
+    const nextMuted = !localMonitorMuted;
+    engineRef.current?.setLocalMonitorMuted(nextMuted);
+    if (!nextMuted) engineRef.current?.setLocalMonitorGain(localMonitorGain);
+    setLocalMonitorMuted(nextMuted);
+  };
+
   return (
     <div className={open ? 'fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-1 sm:p-2' : 'hidden'}>
       <section className="flex h-[calc(100dvh-0.5rem)] max-h-[calc(100dvh-0.5rem)] w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
@@ -583,6 +597,20 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                 </label>
               </div>
               <span className="text-[9px] text-slate-500">SORTIE PGM</span>
+            </aside>
+
+            <aside className="flex h-full w-[148px] shrink-0 flex-col items-center justify-between gap-2 rounded-xl border border-sky-500/60 bg-gradient-to-b from-sky-950/40 to-slate-950 p-2 shadow-lg">
+              <div className="w-full text-center">
+                <strong className="block text-xs font-black tracking-wide text-sky-300">MONITOR LOCAL</strong>
+                <span className="text-[9px] text-slate-400">TÉLÉPHONE / CASQUE</span>
+              </div>
+              <label className="flex flex-1 flex-col items-center justify-center gap-2 text-[9px] font-bold text-slate-300">
+                <span className="text-sky-300">{Math.round(localMonitorGain * 100)}%</span>
+                <input aria-label="Volume écoute locale" type="range" min="0" max="2" step="0.01" value={localMonitorGain} disabled={!engineReady || localMonitorMuted} onChange={(event) => updateLocalMonitorGain(Number(event.target.value))} className="h-36 w-8 accent-sky-400" style={{ writingMode: 'vertical-lr', direction: 'rtl' }} />
+                <span>VOLUME</span>
+              </label>
+              <button onClick={toggleLocalMonitorMute} disabled={!engineReady} className={`w-full rounded px-2 py-2 text-[9px] font-black disabled:opacity-40 ${localMonitorMuted ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-200'}`}>{localMonitorMuted ? 'ÉCOUTE MUTE' : 'MUTE ÉCOUTE'}</button>
+              <span className="text-center text-[8px] text-slate-500">Le PGM reste indépendant</span>
             </aside>
           </div>
         </div>
