@@ -80,6 +80,7 @@ export class CameraLanReceiver {
     const pendingCandidates: RTCIceCandidateInit[] = [];
     this.sessions.set(cameraId, session);
     peer.addTransceiver('video', { direction: 'recvonly' });
+    peer.addTransceiver('audio', { direction: 'recvonly' });
     this.onStatus({ cameraId, state: 'connecting' });
 
     peer.ontrack = (event) => {
