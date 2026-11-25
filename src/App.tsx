@@ -1265,8 +1265,8 @@ export default function App() {
       />
 
       {isMediaPanelOpen && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/85 p-4">
-          <section className="w-full max-w-xl space-y-4 rounded-xl border border-sky-700 bg-slate-900 p-4 shadow-2xl">
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/85 p-2 sm:p-4">
+          <section className="max-h-[calc(100dvh-1rem)] w-full max-w-xl space-y-4 overflow-y-auto overscroll-contain rounded-xl border border-sky-700 bg-slate-900 p-3 shadow-2xl sm:p-4">
             <header className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-black tracking-widest text-sky-300">DSK MEDIA · PLAYBACK</h2>
