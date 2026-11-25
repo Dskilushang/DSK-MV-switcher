@@ -2,12 +2,88 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 jobs:
+
+  build-camera-companion:
+    name: Build DSK Camera Android
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: camera-companion
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Configurer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configurer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installer les dépendances DSK Camera
+        run: npm ci
+
+      - name: Vérifier TypeScript et compiler DSK Camera
+        run: npm run build
+
+      - name: Générer le projet Android natif
+        run: npx cap add android
+
+      - name: Synchroniser Capacitor
+        run: npx cap sync android
+
+      - name: Déclarer et vérifier la permission caméra Android
+        run: |
+          python - <<'PY'
+          import re
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          source = manifest.read_text(encoding="utf-8")
+          opening = re.search(r"<manifest\b[^>]*>", source)
+          if opening is None:
+              raise SystemExit("Balise manifest introuvable")
+          additions = []
+          if "android.permission.CAMERA" not in source:
+              additions.append('    <uses-permission android:name="android.permission.CAMERA" />')
+          if "android.hardware.camera.any" not in source:
+              additions.append('    <uses-feature android:name="android.hardware.camera.any" android:required="true" />')
+          if additions:
+              source = source[:opening.end()] + "\n" + "\n".join(additions) + source[opening.end():]
+          root = ET.fromstring(source)
+          ns = "{http://schemas.android.com/apk/res/android}"
+          permissions = [node.attrib.get(ns + "name") for node in root.findall("uses-permission")]
+          features = [node.attrib.get(ns + "name") for node in root.findall("uses-feature")]
+          if "android.permission.CAMERA" not in permissions:
+              raise SystemExit("Permission CAMERA absente du manifeste")
+          if "android.hardware.camera.any" not in features:
+              raise SystemExit("Fonction caméra absente du manifeste")
+          manifest.write_text(source, encoding="utf-8")
+          print("OK : permission CAMERA et fonctionnalité caméra déclarées.")
+          PY
+
+      - name: Compiler l’APK DSK Camera
+        working-directory: camera-companion/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Sauvegarder l’APK DSK Camera
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsk-camera-android-debug
+          path: camera-companion/android/app/build/outputs/apk/debug/app-debug.apk
   build:
     runs-on: ubuntu-latest
     steps:
@@ -26,10 +102,13 @@ jobs:
           java-version: 17
 
       - name: Installer les dépendances
-        run: npm install
+        run: npm ci
 
       - name: Vérifier les types TypeScript
         run: npx tsc --noEmit
+
+      - name: Vérifier la syntaxe du DSK Audio Receiver
+        run: node --check receiver/server.mjs
 
       - name: Compiler l'application web (Vite)
         run: npm run build
@@ -58,6 +137,8 @@ jobs:
 
           required_permissions = [
               "android.permission.CAMERA",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.MODIFY_AUDIO_SETTINGS",
           ]
           missing_permissions = [
               permission for permission in required_permissions

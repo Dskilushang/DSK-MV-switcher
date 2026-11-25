@@ -26,6 +26,7 @@ const TBar: React.FC<TBarProps> = ({
 
     thumb.style.transition = animate ? 'transform 0.2s ease-out' : 'none';
     thumb.style.transform = `translateY(-${progress * TRACK_HEIGHT}px)`;
+    thumb.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
