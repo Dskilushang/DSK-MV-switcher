@@ -54,6 +54,7 @@ export class AudioEngine {
   private readonly masterLeftAnalyser: AnalyserNode;
   private readonly masterRightAnalyser: AnalyserNode;
   private readonly programDestination: MediaStreamAudioDestinationNode;
+  private readonly localMonitorGain: GainNode;
   private disposed = false;
 
   constructor(options: AudioEngineOptions = {}) {
@@ -73,9 +74,15 @@ export class AudioEngine {
     this.masterLeftAnalyser.fftSize = 2048;
     this.masterRightAnalyser.fftSize = 2048;
     this.programDestination = this.context.createMediaStreamDestination();
+    this.localMonitorGain = this.context.createGain();
+    this.localMonitorGain.gain.value = 0.8;
 
     this.masterGain.connect(this.masterAnalyser);
     this.masterAnalyser.connect(this.programDestination);
+    // Local monitoring is independent from the PGM stream sent to streaming/recording.
+    // Android routes context.destination to the active speaker or connected headset.
+    this.masterGain.connect(this.localMonitorGain);
+    this.localMonitorGain.connect(this.context.destination);
     this.masterGain.connect(this.masterSplitter);
     this.masterSplitter.connect(this.masterLeftAnalyser, 0);
     this.masterSplitter.connect(this.masterRightAnalyser, 1);
@@ -283,6 +290,19 @@ export class AudioEngine {
     this.masterGain.gain.setTargetAtTime(gain, this.context.currentTime, 0.015);
   }
 
+  /** Independent local speaker/headphone monitor level; does not change the PGM stream. */
+  setLocalMonitorGain(gain: number): void {
+    if (!Number.isFinite(gain) || gain < 0 || gain > 2) {
+      throw new RangeError('Local monitor gain must be between 0 and 2.');
+    }
+    this.localMonitorGain.gain.setTargetAtTime(gain, this.context.currentTime, 0.015);
+  }
+
+  /** Mutes only the phone/headphone monitor, never the PGM stream. */
+  setLocalMonitorMuted(muted: boolean): void {
+    this.localMonitorGain.gain.setTargetAtTime(muted ? 0 : 1, this.context.currentTime, 0.015);
+  }
+
   getChannelSnapshot(channelId: number): AudioChannelSnapshot {
     const channel = this.getChannel(channelId);
     return {
@@ -340,6 +360,7 @@ export class AudioEngine {
     this.masterLeftAnalyser.disconnect();
     this.masterRightAnalyser.disconnect();
     this.programDestination.disconnect();
+    this.localMonitorGain.disconnect();
 
     if (this.ownsContext && this.context.state !== 'closed') {
       await this.context.close();
