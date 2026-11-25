@@ -301,7 +301,8 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
-        audio: false
+        // Capture the local microphone with CAM1 so it can be routed through the audio mixer.
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
       });
       setCameraStream(stream);
       setCameraStatus('active');
