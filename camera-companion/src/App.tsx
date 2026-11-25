@@ -95,7 +95,7 @@ export default function App() {
 
     try {
       const media = await navigator.mediaDevices.getUserMedia({
-        audio: false,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
         video: {
           facingMode: { ideal: facing },
           width: { ideal: 1280 },
@@ -122,7 +122,7 @@ export default function App() {
       const peer = new RTCPeerConnection({ iceServers: [] });
       socketRef.current = socket;
       peerRef.current = peer;
-      media.getVideoTracks().forEach((track) => peer.addTrack(track, media));
+      media.getTracks().forEach((track) => peer.addTrack(track, media));
 
       peer.onicecandidate = (event) => {
         if (event.candidate && socket.readyState === WebSocket.OPEN) {
@@ -133,10 +133,10 @@ export default function App() {
         if (!activeRef.current) return;
         if (peer.connectionState === 'connected') {
           setState('connected');
-          setMessage(`CAM ${cameraId} · VIDÉO TRANSMISE`);
+          setMessage(`CAM ${cameraId} · VIDÉO + AUDIO TRANSMIS`);
         } else if (peer.connectionState === 'failed') {
           setState('error');
-          setMessage('Connexion vidéo impossible. Vérifiez le Wi-Fi, le pare-feu et le Receiver.');
+          setMessage('Connexion vidéo/audio impossible. Vérifiez le Wi-Fi, les autorisations caméra/micro et le Receiver.');
         } else if (peer.connectionState === 'disconnected') {
           setState('waiting');
           setMessage('Liaison vidéo interrompue. En attente du réseau…');
