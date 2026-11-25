@@ -467,16 +467,16 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
           )}
         </div></details>
 
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain p-2">
-          <div className="flex h-full min-w-max items-stretch gap-2">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-2">
+          <div className="flex h-full min-h-[320px] min-w-max items-stretch gap-2 pb-1">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
             const isMediaChannel = mediaChannelsRef.current.has(channelId);
             const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
-              <article key={channelId} className="grid h-full w-[148px] shrink-0 grid-cols-[minmax(0,1fr)_12px] items-stretch gap-1 rounded-lg border border-slate-700 bg-slate-800/80 p-2">
-                <div className="flex min-w-0 flex-col gap-2">
+              <article key={channelId} className="grid h-full w-[176px] shrink-0 grid-cols-[minmax(0,1fr)_14px] items-stretch gap-2 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900 p-2.5 shadow-lg">
+                <div className="flex min-w-0 flex-col gap-2.5">
                 <div className="flex items-center justify-between gap-1">
                   <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
                   <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
@@ -487,7 +487,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   value={selectedDevices[channelId] || ''}
                   onChange={(event) => setSelectedDevices((current) => ({ ...current, [channelId]: event.target.value }))}
                   disabled={!engineReady || connected}
-                  className="h-9 w-full min-w-0 rounded border border-slate-600 bg-slate-950 px-1 text-[9px] text-white disabled:opacity-50"
+                  className="h-9 w-full min-w-0 rounded-md border border-slate-600 bg-slate-950 px-2 text-[10px] text-white disabled:opacity-50"
                 >
                   <option value="">Entrée audio…</option>
                   {devices.map((device) => (
@@ -501,19 +501,19 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   ) : belongsToUsbGroup ? (
                     <div className="rounded bg-amber-900/70 px-1 py-2 text-center text-[9px] font-bold text-amber-200">USB · CH {multiChannelGroup?.channelIds.indexOf(channelId)! + 1}</div>
                   ) : (
-                    <button onClick={() => disconnectChannel(channelId)} className="rounded bg-red-800 px-1 py-2 text-[9px] font-bold text-white">DÉCONNECTER</button>
+                    <button onClick={() => disconnectChannel(channelId)} className="min-h-9 w-full whitespace-normal rounded-md bg-red-800 px-2 py-2 text-center text-[9px] font-bold leading-tight text-white">DÉCONNECTER</button>
                   )
                 ) : (
                   <button
                     onClick={() => void connectChannel(channelId)}
                     disabled={!engineReady || busyChannel !== null}
-                    className="rounded bg-emerald-800 px-1 py-2 text-[9px] font-bold text-white disabled:opacity-40"
+                    className="min-h-9 w-full whitespace-normal rounded-md bg-emerald-800 px-2 py-2 text-center text-[9px] font-bold leading-tight text-white disabled:opacity-40"
                   >
                     {busyChannel === channelId ? 'CONNEXION…' : 'CONNECTER'}
                   </button>
                 )}
 
-                <div className="grid grid-cols-2 gap-1 rounded-md border border-slate-700/80 bg-slate-950/50 px-1 py-2">
+                <div className="grid min-h-[116px] grid-cols-2 items-center gap-1 rounded-lg border border-slate-700/80 bg-slate-950/70 px-2 py-2">
                   <RotaryKnob
                     label="GAIN" value={channel?.gain ?? 1} min={0} max={2} step={0.01}
                     defaultValue={1} disabled={!engineReady} colorClass="text-rose-400"
@@ -543,7 +543,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
             );
           })}
 
-            <aside className="flex h-full w-[156px] shrink-0 flex-col items-center gap-3 rounded-lg border border-amber-500/50 bg-slate-950 p-3">
+            <aside className="flex h-full w-[176px] shrink-0 flex-col items-center gap-3 rounded-xl border border-amber-400/70 bg-gradient-to-b from-amber-950/40 to-slate-950 p-3 shadow-[0_0_18px_rgba(245,158,11,0.10)]">
               <div className="w-full text-center">
                 <strong className="block text-xs font-black tracking-wide text-amber-300">PGM MASTER</strong>
                 <span className="text-[10px] tabular-nums text-slate-400">L {formatDb(masterStereoMeters.left.rmsDb)} · R {formatDb(masterStereoMeters.right.rmsDb)}</span>
@@ -556,7 +556,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   ] as const).map(([side, reading]) => (
                     <div key={side} className="flex h-full items-center gap-1">
                       <span className="text-[9px] font-bold text-slate-400">{side}</span>
-                      <div className="flex h-full max-h-64 w-4 flex-col justify-end overflow-hidden rounded border border-slate-700 bg-black p-0.5" role="meter" aria-label={`Niveau PGM ${side} : RMS ${formatDb(reading.rmsDb)}, peak ${formatDb(reading.peakDb)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={meterWidth(reading.rmsDb)}>
+                      <div className="flex h-full max-h-64 w-5 flex-col justify-end overflow-hidden rounded border border-slate-700 bg-black p-0.5" role="meter" aria-label={`Niveau PGM ${side} : RMS ${formatDb(reading.rmsDb)}, peak ${formatDb(reading.peakDb)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={meterWidth(reading.rmsDb)}>
                         <div className="w-full rounded-sm bg-emerald-500 transition-[height] duration-100" style={{ height: `${meterWidth(reading.rmsDb)}%` }} />
                       </div>
                     </div>
@@ -573,7 +573,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                     value={masterGain}
                     disabled={!engineReady}
                     onChange={(event) => updateMasterGain(Number(event.target.value))}
-                    className="h-44 w-8 accent-amber-400"
+                    className="h-44 w-9 accent-amber-400"
                     style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
                   />
                   <span>MASTER</span>
