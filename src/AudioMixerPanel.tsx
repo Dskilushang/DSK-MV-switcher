@@ -392,8 +392,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   };
 
   return (
-    <div className={open ? 'fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-2' : 'hidden'}>
-      <section className="flex h-full max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+    <div className={open ? 'fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-1 sm:p-2' : 'hidden'}>
+      <section className="flex h-[calc(100dvh-0.5rem)] max-h-[calc(100dvh-0.5rem)] w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-700 bg-slate-950 px-3 py-2">
           <div>
             <h2 className="text-sm font-black tracking-wider text-amber-400">MIXEUR AUDIO</h2>
@@ -417,7 +417,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
 
         <AudioNetworkPanel engine={engineRef.current} enabled={engineReady} />
 
-        <details className="shrink-0 border-b border-slate-700 bg-slate-800/70 px-3 py-2"><summary className="cursor-pointer list-none text-[10px] font-bold text-slate-200">ENTRÉE USB {multiChannelGroup ? "· CONNECTÉE" : "· CONFIGURATION"}</summary><div className="grid grid-cols-[1.4fr_0.7fr_0.7fr_auto] items-end gap-2 pt-2">
+        <details className="shrink-0 border-b border-slate-700 bg-slate-800/70 px-3 py-2"><summary className="cursor-pointer list-none text-[10px] font-bold text-slate-200">ENTRÉE USB {multiChannelGroup ? "· CONNECTÉE" : "· CONFIGURATION"}</summary><div className="grid grid-cols-2 items-end gap-2 pt-2 sm:grid-cols-[1.4fr_0.7fr_0.7fr_auto]">
           <label className="min-w-0 space-y-1 text-[9px] text-slate-400">
             <span>INTERFACE USB MULTICANALE</span>
             <select
@@ -470,7 +470,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
           )}
         </div></details>
 
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x p-2">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-2">
           <div className="flex h-full min-h-[260px] min-w-max items-stretch gap-1.5 pb-1">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
