@@ -1263,6 +1263,7 @@ export default function App() {
         onProgramStreamChange={setProgramAudioStream}
         onConnectedInputsChange={setConnectedAudioInputs}
         onMediaAudioRouteReady={handleMediaAudioRouteReady}
+        cameraStream={cameraStream}
       />
 
       {isMediaPanelOpen && (
