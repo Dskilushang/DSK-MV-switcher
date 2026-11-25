@@ -11,6 +11,7 @@ type AudioMixerPanelProps = {
   open: boolean;
   onClose: () => void;
   onProgramStreamChange?: (stream: MediaStream | null) => void;
+  onConnectedInputsChange?: (count: number) => void;
   onMediaAudioRouteReady?: (route: MediaAudioRoute | null) => void;
 };
 
@@ -132,7 +133,7 @@ function RotaryKnob({
   );
 }
 
-export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onMediaAudioRouteReady }: AudioMixerPanelProps) {
+export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, onConnectedInputsChange, onMediaAudioRouteReady }: AudioMixerPanelProps) {
   const engineRef = useRef<AudioEngine | null>(null);
   const streamsRef = useRef<Map<number, MediaStream>>(new Map());
   const mediaChannelsRef = useRef<Set<number>>(new Set());
@@ -157,10 +158,11 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     try {
       setChannels(engine.getAllChannelSnapshots());
       setMasterStereoMeters(engine.getMasterStereoMeters());
+      onConnectedInputsChange?.(engine.getConnectedChannelCount());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
-  }, []);
+  }, [onConnectedInputsChange]);
 
   useEffect(() => {
     if (!engineReady || !engineRef.current) {
@@ -206,6 +208,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       const engine = engineRef.current;
       engineRef.current = null;
       onProgramStreamChange?.(null);
+      onConnectedInputsChange?.(0);
       if (engine) void engine.dispose();
     };
   }, []);
