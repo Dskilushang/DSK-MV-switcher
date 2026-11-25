@@ -19,6 +19,7 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMessage, setRecordingMessage] = useState('');
   const [programAudioStream, setProgramAudioStream] = useState<MediaStream | null>(null);
+  const [connectedAudioInputs, setConnectedAudioInputs] = useState(0);
   const [isMediaPanelOpen, setIsMediaPanelOpen] = useState(false);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaFileName, setMediaFileName] = useState('');
@@ -751,7 +752,7 @@ export default function App() {
     try {
       videoStream = programCanvasRef.current.captureStream(30);
       recordingVideoStreamRef.current = videoStream;
-      const audioTracks = programAudioStream?.getAudioTracks() || [];
+      const audioTracks = connectedAudioInputs > 0 ? (programAudioStream?.getAudioTracks() || []) : [];
       const recordingStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...audioTracks
@@ -767,7 +768,9 @@ export default function App() {
 
       mediaRecorderRef.current = recorder;
       recordedChunks.current = [];
-      setRecordingMessage(audioTracks.length ? 'REC · PGM vidéo + audio stéréo' : 'REC · vidéo seule (moteur audio non activé)');
+      setRecordingMessage(audioTracks.length
+        ? `REC · PGM vidéo + audio stéréo · ${connectedAudioInputs} entrée(s) connectée(s)`
+        : 'REC · vidéo seule · aucune entrée audio connectée');
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) recordedChunks.current.push(event.data);
       };
@@ -1257,6 +1260,7 @@ export default function App() {
         open={isAudioPanelOpen}
         onClose={() => setIsAudioPanelOpen(false)}
         onProgramStreamChange={setProgramAudioStream}
+        onConnectedInputsChange={setConnectedAudioInputs}
         onMediaAudioRouteReady={handleMediaAudioRouteReady}
       />
 
