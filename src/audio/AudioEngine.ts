@@ -48,6 +48,7 @@ export class AudioEngine {
   private readonly ownsContext: boolean;
   private readonly channels = new Map<number, ChannelGraph>();
   private readonly mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
+  // Keep analyser sample buffers between meter refreshes to avoid repeated allocations.
   private readonly meterBuffers = new WeakMap<AnalyserNode, Float32Array>();
   private readonly masterGain: GainNode;
   private readonly masterAnalyser: AnalyserNode;
