@@ -275,7 +275,7 @@ export default function SystemPanel(props: SystemPanelProps) {
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
                 <div>
                   <h3 className="text-[10px] font-black tracking-widest text-sky-300">JOURNAL DE DIAGNOSTIC</h3>
-                  <p className="mt-1 text-[9px] text-slate-400">{diagnosticEvents.length} événement(s) en mémoire · tampon limité à 180</p>
+                  <p className="mt-1 text-[9px] text-slate-400">{diagnosticEvents.length} événement(s) en mémoire · tampon limité à 250</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { void copyDiagnosticLog().then((copied) => setDiagnosticCopyMessage(copied ? 'Journal copié.' : 'Copie impossible sur cet appareil.')); }} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white">COPIER</button>
@@ -289,7 +289,7 @@ export default function SystemPanel(props: SystemPanelProps) {
                 {[...diagnosticEvents].reverse().map((event) => (
                   <article key={event.id} className="rounded border border-slate-800 bg-slate-900 p-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`text-[9px] font-black uppercase ${event.category === 'error' ? 'text-red-300' : event.category === 'network' ? 'text-amber-300' : 'text-sky-300'}`}>{event.category}</span>
+                      <span className={`text-[9px] font-black uppercase ${event.level === 'error' ? 'text-red-300' : event.level === 'warn' ? 'text-amber-300' : 'text-sky-300'}`}>{event.level.toUpperCase()} · {event.category}</span>
                       <time className="text-[8px] text-slate-500">{event.timestamp}</time>
                     </div>
                     <p className="mt-1 text-[10px] font-bold text-slate-200">{event.message}</p>
