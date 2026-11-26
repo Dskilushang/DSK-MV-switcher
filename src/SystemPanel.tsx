@@ -228,7 +228,7 @@ export default function SystemPanel(props: SystemPanelProps) {
           <button onClick={onClose} className="min-h-10 min-w-10 rounded bg-slate-800 text-white">✕</button>
         </header>
 
-        <nav className="grid grid-cols-4 gap-1 border-b border-slate-800 bg-slate-900 p-2">
+        <nav className="grid grid-cols-2 gap-1 border-b border-slate-800 bg-slate-900 p-2 sm:grid-cols-4">
           {([
             ['overview', 'ÉTAT SYSTÈME'],
             ['profiles', 'PROFILS'],
