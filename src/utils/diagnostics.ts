@@ -17,8 +17,28 @@ export type DiagnosticEvent = {
 };
 
 const MAX_EVENTS = 180;
-let nextId = 1;
-let events: DiagnosticEvent[] = [];
+const STORAGE_KEY = 'dsk-mv-diagnostic-log-v1';
+
+function readStoredEvents(): DiagnosticEvent[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is DiagnosticEvent =>
+      !!item &&
+      typeof item.id === 'number' &&
+      typeof item.timestamp === 'string' &&
+      typeof item.category === 'string' &&
+      typeof item.message === 'string'
+    ).slice(-MAX_EVENTS);
+  } catch {
+    return [];
+  }
+}
+
+let events: DiagnosticEvent[] = typeof window !== 'undefined' ? readStoredEvents() : [];
+let nextId = events.reduce((highest, event) => Math.max(highest, event.id), 0) + 1;
 const subscribers = new Set<(items: DiagnosticEvent[]) => void>();
 
 function notify(): void {
@@ -45,6 +65,11 @@ export function recordDiagnostic(
     ...(details ? { details } : {})
   };
   events = [...events, event].slice(-MAX_EVENTS);
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  } catch {
+    // Keep the in-memory buffer usable when storage is unavailable or full.
+  }
   notify();
 }
 
