@@ -32,7 +32,7 @@ function readStoredEvents(): DiagnosticEvent[] {
       typeof item.timestamp === 'string' &&
       typeof item.category === 'string' &&
       typeof item.message === 'string'
-    ).map((item) => ({ ...item, level: item.level === 'warn' || item.level === 'error' ? item.level : 'info' })).slice(-MAX_EVENTS);
+    ).map((item) => ({ ...item, level: (item.level === 'warn' || item.level === 'error' ? item.level : 'info') as DiagnosticEvent['level'] })).slice(-MAX_EVENTS);
   } catch {
     return [];
   }
