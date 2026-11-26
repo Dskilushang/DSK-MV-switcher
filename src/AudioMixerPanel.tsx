@@ -164,7 +164,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       setMasterStereoMeters(masterMeters);
       onConnectedInputsChange?.(engine.getConnectedChannelCount());
       const now = Date.now();
-      if (now - lastAudioDiagnosticAtRef.current >= 2000) {
+      if (now - lastAudioDiagnosticAtRef.current >= 5000) {
         lastAudioDiagnosticAtRef.current = now;
         logAudioDiagnostic('Instantané des signaux audio', {
           engineReady: true,
