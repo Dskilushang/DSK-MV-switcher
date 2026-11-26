@@ -216,7 +216,7 @@ export function installDiagnostics(
 }
 
 export async function copyDiagnosticLog(): Promise<boolean> {
-  const output = events.map((event) => JSON.stringify(event)).join('\\n');
+  const output = events.map((event) => JSON.stringify(event)).join(String.fromCharCode(10));
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(output);
