@@ -8,6 +8,7 @@ import AudioMixerPanel, { type MediaAudioRoute } from './AudioMixerPanel';
 import SystemPanel from './SystemPanel';
 import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
 import { connectObs, disconnectObs, getSceneList, getObsStreamActive, registerCallbacks, setProgramScene, startObsStream, stopObsStream, type ObsStatus } from './services/obsService';
+import { installDiagnostics, type DiagnosticSnapshot } from './utils/diagnostics';
 
 export default function App() {
   // --- ÉTATS DU MÉLANGEUR ---
@@ -873,6 +874,27 @@ export default function App() {
       setIsLiveBusy(false);
     }
   };
+
+  const diagnosticsSnapshotRef = useRef<DiagnosticSnapshot>({
+    camera: 'idle',
+    mediaLoaded: false,
+    mediaPlaying: false,
+    mixerOpen: false,
+    connectedAudioInputs: 0,
+    live: false,
+    recording: false
+  });
+  diagnosticsSnapshotRef.current = {
+    camera: cameraStatus,
+    mediaLoaded: !!mediaUrl,
+    mediaPlaying: isMediaPlaying,
+    mixerOpen: isAudioPanelOpen,
+    connectedAudioInputs,
+    live: isLive,
+    recording: isRecording
+  };
+
+  useEffect(() => installDiagnostics(() => diagnosticsSnapshotRef.current), []);
 
   return (
     <div className="h-[100dvh] w-[100dvw] bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden relative">
