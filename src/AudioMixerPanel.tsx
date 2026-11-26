@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine, type AudioChannelSnapshot, type AudioInputDevice, type AudioMeterReading } from './audio/AudioEngine';
 import AudioNetworkPanel from './AudioNetworkPanel';
+import { logAudioDiagnostic } from './utils/diagnostics';
 
 export type MediaAudioRoute = {
   connect: (channelId: number, element: HTMLMediaElement) => void;
@@ -151,18 +152,54 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Moteur audio arrêté');
+  const lastAudioDiagnosticAtRef = useRef(0);
 
   const refreshMeters = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
     try {
-      setChannels(engine.getAllChannelSnapshots());
-      setMasterStereoMeters(engine.getMasterStereoMeters());
+      const channelSnapshots = engine.getAllChannelSnapshots();
+      const masterMeters = engine.getMasterStereoMeters();
+      setChannels(channelSnapshots);
+      setMasterStereoMeters(masterMeters);
       onConnectedInputsChange?.(engine.getConnectedChannelCount());
+      const now = Date.now();
+      if (now - lastAudioDiagnosticAtRef.current >= 2000) {
+        lastAudioDiagnosticAtRef.current = now;
+        logAudioDiagnostic('Instantané des signaux audio', {
+          engineReady: true,
+          connectedInputs: engine.getConnectedChannelCount(),
+          channels: channelSnapshots.map((channel) => ({
+            id: channel.id,
+            name: channel.name,
+            gain: channel.gain,
+            pan: channel.pan,
+            muted: channel.muted,
+            rmsDb: Number.isFinite(channel.meter.rmsDb) ? channel.meter.rmsDb : null,
+            peakDb: Number.isFinite(channel.meter.peakDb) ? channel.meter.peakDb : null,
+            connected: streamsRef.current.has(channel.id) || mediaChannelsRef.current.has(channel.id),
+            source: mediaChannelsRef.current.has(channel.id) ? 'MEDIA player' : devices.find((device) => device.deviceId === selectedDevices[channel.id])?.label || null
+          })),
+          masterGain,
+          masterLeftRmsDb: Number.isFinite(masterMeters.left.rmsDb) ? masterMeters.left.rmsDb : null,
+          masterRightRmsDb: Number.isFinite(masterMeters.right.rmsDb) ? masterMeters.right.rmsDb : null
+        });
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
-  }, [onConnectedInputsChange]);
+  }, [devices, masterGain, onConnectedInputsChange, selectedDevices]);
+
+  useEffect(() => {
+    if (open) {
+      logAudioDiagnostic('Interface du mixeur affichée', {
+        channelCount: CHANNEL_COUNT,
+        channelStripScroll: 'horizontal',
+        headphonePhoneVolumeControlPresent: false,
+        engineReady
+      });
+    }
+  }, [open, engineReady]);
 
   useEffect(() => {
     if (!engineReady || !engineRef.current) {
@@ -286,8 +323,10 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       previous?.getTracks().forEach((track) => track.stop());
       refreshMeters();
       setStatus(`CH ${channelId} connecté`);
+      logAudioDiagnostic('Entrée audio connectée', { channelId, deviceLabel: devices.find((device) => device.deviceId === deviceId)?.label || 'non identifié', trackCount: stream.getAudioTracks().length });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `Connexion de CH ${channelId} impossible.`);
+      logAudioDiagnostic('Échec de connexion d’une entrée audio', { channelId, error: cause instanceof Error ? cause.message : String(cause) }, 'error');
     } finally {
       setBusyChannel(null);
     }
@@ -372,21 +411,25 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
 
   const updateGain = (channelId: number, value: number) => {
     engineRef.current?.setChannelGain(channelId, value);
+    logAudioDiagnostic('Gain de canal modifié', { channelId, gain: value });
     refreshMeters();
   };
 
   const updatePan = (channelId: number, value: number) => {
     engineRef.current?.setChannelPan(channelId, value);
+    logAudioDiagnostic('Panoramique de canal modifié', { channelId, pan: value });
     refreshMeters();
   };
 
   const toggleMute = (channelId: number, muted: boolean) => {
     engineRef.current?.setChannelMuted(channelId, muted);
+    logAudioDiagnostic('Mute de canal modifié', { channelId, muted });
     refreshMeters();
   };
 
   const updateMasterGain = (value: number) => {
     engineRef.current?.setMasterGain(value);
+    logAudioDiagnostic('Gain master modifié', { masterGain: value });
     setMasterGain(value);
     refreshMeters();
   };
