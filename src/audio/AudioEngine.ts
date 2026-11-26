@@ -48,6 +48,8 @@ export class AudioEngine {
   private readonly ownsContext: boolean;
   private readonly channels = new Map<number, ChannelGraph>();
   private readonly mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
+  // Keep analyser sample buffers between meter refreshes to avoid repeated allocations.
+  private readonly meterBuffers = new WeakMap<AnalyserNode, Float32Array<ArrayBuffer>>();
   private readonly masterGain: GainNode;
   private readonly masterAnalyser: AnalyserNode;
   private readonly masterSplitter: ChannelSplitterNode;
@@ -410,7 +412,11 @@ export class AudioEngine {
   }
 
   private readMeter(analyser: AnalyserNode): AudioMeterReading {
-    const samples = new Float32Array(analyser.fftSize);
+    let samples = this.meterBuffers.get(analyser);
+    if (!samples || samples.length !== analyser.fftSize) {
+      samples = new Float32Array(analyser.fftSize);
+      this.meterBuffers.set(analyser, samples);
+    }
     analyser.getFloatTimeDomainData(samples);
 
     let sumSquares = 0;
