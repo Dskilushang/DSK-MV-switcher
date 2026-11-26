@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { clearDiagnosticLog, copyDiagnosticLog, subscribeDiagnostics, type DiagnosticEvent } from './utils/diagnostics';
 
 type ObsStatus = 'connected' | 'connecting' | 'disconnected' | 'error' | string;
 
@@ -103,9 +104,13 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [deviceItems, setDeviceItems] = useState<DeviceItem[]>([]);
   const [deviceMessage, setDeviceMessage] = useState('Actualisez la liste pour détecter les périphériques.');
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'profiles' | 'devices'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profiles' | 'devices' | 'diagnostics'>('overview');
+  const [diagnosticEvents, setDiagnosticEvents] = useState<DiagnosticEvent[]>([]);
+  const [diagnosticCopyMessage, setDiagnosticCopyMessage] = useState('');
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
+
+  useEffect(() => subscribeDiagnostics(setDiagnosticEvents), []);
 
   useEffect(() => {
     if (!open) return;
@@ -223,11 +228,12 @@ export default function SystemPanel(props: SystemPanelProps) {
           <button onClick={onClose} className="min-h-10 min-w-10 rounded bg-slate-800 text-white">✕</button>
         </header>
 
-        <nav className="grid grid-cols-3 gap-1 border-b border-slate-800 bg-slate-900 p-2">
+        <nav className="grid grid-cols-2 gap-1 border-b border-slate-800 bg-slate-900 p-2 sm:grid-cols-4">
           {([
             ['overview', 'ÉTAT SYSTÈME'],
             ['profiles', 'PROFILS'],
-            ['devices', 'PÉRIPHÉRIQUES']
+            ['devices', 'PÉRIPHÉRIQUES'],
+            ['diagnostics', 'JOURNAL']
           ] as const).map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded px-2 py-3 text-[10px] font-black ${activeTab === tab ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
               {label}
@@ -262,6 +268,36 @@ export default function SystemPanel(props: SystemPanelProps) {
               </div>
               <p className="text-[10px] text-slate-500">Ces contrôles vérifient la présence des API du navigateur et l’état réseau. Ils ne remplacent pas les essais réels des caméras, interfaces audio ou sorties vidéo.</p>
             </>
+          )}
+
+          {activeTab === 'diagnostics' && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <div>
+                  <h3 className="text-[10px] font-black tracking-widest text-sky-300">JOURNAL DE DIAGNOSTIC</h3>
+                  <p className="mt-1 text-[9px] text-slate-400">{diagnosticEvents.length} événement(s) en mémoire · tampon limité à 250</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { void copyDiagnosticLog().then((copied) => setDiagnosticCopyMessage(copied ? 'Journal copié.' : 'Copie impossible sur cet appareil.')); }} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white">COPIER</button>
+                  <button onClick={() => { clearDiagnosticLog(); setDiagnosticCopyMessage(''); }} className="rounded bg-slate-700 px-3 py-2 text-[9px] font-black text-white">EFFACER</button>
+                </div>
+              </div>
+              {diagnosticCopyMessage && <p role="status" className="text-[10px] text-emerald-300">{diagnosticCopyMessage}</p>}
+              <p className="text-[9px] text-slate-500">Les événements sont conservés en mémoire tant que le processus reste actif. Copiez le journal avant de fermer l’application ou de reproduire un incident. Le journal ne modifie pas les flux audio/vidéo.</p>
+              <div className="max-h-[48dvh] space-y-2 overflow-y-auto">
+                {diagnosticEvents.length === 0 && <p className="rounded border border-slate-800 bg-slate-900 p-4 text-xs text-slate-500">Aucun événement enregistré.</p>}
+                {[...diagnosticEvents].reverse().map((event) => (
+                  <article key={event.id} className="rounded border border-slate-800 bg-slate-900 p-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={`text-[9px] font-black uppercase ${event.level === 'error' ? 'text-red-300' : event.level === 'warn' ? 'text-amber-300' : 'text-sky-300'}`}>{event.level.toUpperCase()} · {event.category}</span>
+                      <time className="text-[8px] text-slate-500">{event.timestamp}</time>
+                    </div>
+                    <p className="mt-1 text-[10px] font-bold text-slate-200">{event.message}</p>
+                    {event.details && <pre className="mt-1 whitespace-pre-wrap break-words text-[9px] text-slate-400">{JSON.stringify(event.details, null, 2)}</pre>}
+                  </article>
+                ))}
+              </div>
+            </div>
           )}
 
           {activeTab === 'profiles' && (

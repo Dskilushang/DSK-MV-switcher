@@ -8,6 +8,7 @@ import AudioMixerPanel, { type MediaAudioRoute } from './AudioMixerPanel';
 import SystemPanel from './SystemPanel';
 import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
 import { connectObs, disconnectObs, getSceneList, getObsStreamActive, registerCallbacks, setProgramScene, startObsStream, stopObsStream, type ObsStatus } from './services/obsService';
+import { installDiagnostics, recordDiagnostic, logCameraDiagnostic, logMediaDiagnostic, type DiagnosticSnapshot } from './utils/diagnostics';
 
 export default function App() {
   // --- ÉTATS DU MÉLANGEUR ---
@@ -874,6 +875,67 @@ export default function App() {
     }
   };
 
+  const diagnosticsSnapshotRef = useRef<DiagnosticSnapshot>({
+    camera: 'idle',
+    mediaLoaded: false,
+    mediaPlaying: false,
+    mixerOpen: false,
+    connectedAudioInputs: 0,
+    live: false,
+    recording: false
+  });
+  diagnosticsSnapshotRef.current = {
+    camera: cameraStatus,
+    mediaLoaded: !!mediaUrl,
+    mediaPlaying: isMediaPlaying,
+    mixerOpen: isAudioPanelOpen,
+    connectedAudioInputs,
+    live: isLive,
+    recording: isRecording
+  };
+
+  useEffect(() => installDiagnostics(() => diagnosticsSnapshotRef.current), []);
+
+  useEffect(() => {
+    const tracks = cameraStream?.getVideoTracks().map((track) => ({
+      label: track.label,
+      readyState: track.readyState,
+      enabled: track.enabled,
+      muted: track.muted
+    })) ?? [];
+    logCameraDiagnostic('État de la caméra modifié', {
+      status: cameraStatus,
+      streamPresent: !!cameraStream,
+      videoTracks: tracks,
+      error: cameraError || null
+    }, cameraStatus === 'error' ? 'error' : 'info');
+  }, [cameraStatus, cameraStream, cameraError]);
+
+  useEffect(() => {
+    logMediaDiagnostic('État du lecteur média modifié', {
+      loaded: !!mediaUrl,
+      fileName: mediaFileName || null,
+      playing: isMediaPlaying,
+      currentTime: mediaVideoRef.current?.currentTime ?? null,
+      duration: mediaVideoRef.current?.duration ?? null,
+      paused: mediaVideoRef.current?.paused ?? null,
+      readyState: mediaVideoRef.current?.readyState ?? null,
+      audioRoutedChannel: mediaAudioRoutedChannel
+    });
+  }, [mediaUrl, mediaFileName, isMediaPlaying, mediaAudioRoutedChannel]);
+
+  useEffect(() => {
+    recordDiagnostic('state', 'État des modules modifié', {
+      camera: cameraStatus,
+      mediaLoaded: !!mediaUrl,
+      mediaPlaying: isMediaPlaying,
+      mixerOpen: isAudioPanelOpen,
+      connectedAudioInputs,
+      live: isLive,
+      recording: isRecording
+    });
+  }, [cameraStatus, mediaUrl, isMediaPlaying, isAudioPanelOpen, connectedAudioInputs, isLive, isRecording]);
+
   return (
     <div className="h-[100dvh] w-[100dvw] bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden relative">
       
@@ -930,12 +992,12 @@ export default function App() {
                 preload="metadata"
                 playsInline
                 muted={mediaAudioRoutedChannel === null}
-                onError={() => setMediaAudioError('Format vidéo ou codec non pris en charge par cet appareil.')}
-                onLoadedMetadata={(event) => setMediaDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
+                onError={(event) => { const video = event.currentTarget; const error = video.error; logMediaDiagnostic('Erreur de lecture vidéo', { fileName: mediaFileName || null, mediaErrorCode: error?.code ?? null, mediaErrorMessage: error?.message ?? null, currentTime: video.currentTime, readyState: video.readyState }, 'error'); setMediaAudioError('Format vidéo ou codec non pris en charge par cet appareil.'); }}
+                onLoadedMetadata={(event) => { const video = event.currentTarget; setMediaDuration(Number.isFinite(video.duration) ? video.duration : 0); logMediaDiagnostic('Métadonnées média chargées', { fileName: mediaFileName || null, duration: Number.isFinite(video.duration) ? video.duration : null, videoWidth: video.videoWidth, videoHeight: video.videoHeight }); }}
                 onTimeUpdate={(event) => setMediaCurrentTime(event.currentTarget.currentTime)}
-                onPlay={() => setIsMediaPlaying(true)}
-                onPause={() => setIsMediaPlaying(false)}
-                onEnded={() => setIsMediaPlaying(false)}
+                onPlay={(event) => { const video = event.currentTarget; setIsMediaPlaying(true); logMediaDiagnostic('Lecture média démarrée', { fileName: mediaFileName || null, currentTime: video.currentTime, audioRoutedChannel: mediaAudioRoutedChannel, muted: video.muted }); }}
+                onPause={(event) => { const video = event.currentTarget; setIsMediaPlaying(false); logMediaDiagnostic('Lecture média mise en pause', { fileName: mediaFileName || null, currentTime: video.currentTime, audioRoutedChannel: mediaAudioRoutedChannel, muted: video.muted }); }}
+                onEnded={(event) => { setIsMediaPlaying(false); logMediaDiagnostic('Lecture média terminée', { fileName: mediaFileName || null, currentTime: event.currentTarget.currentTime }); }}
                 className={`absolute inset-0 h-full w-full object-contain ${previewChannel === 9 ? 'block' : 'hidden'}`}
               />
               <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-2 py-1 rounded z-10">PVW · {previewChannel === 9 ? 'MEDIA' : 'PREVIEW'}</span>
