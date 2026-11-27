@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine, type AudioChannelSnapshot, type AudioInputDevice, type AudioMeterReading } from './audio/AudioEngine';
 import AudioNetworkPanel from './AudioNetworkPanel';
+import { recordDiagnostic } from './services/diagnostics';
 
 export type MediaAudioRoute = {
   connect: (channelId: number, element: HTMLMediaElement) => void;
@@ -151,15 +152,29 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Moteur audio arrêté');
+  const lastSilentDiagnosticAtRef = useRef(0);
 
   const refreshMeters = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
     try {
-      setChannels(engine.getAllChannelSnapshots());
-      setMasterStereoMeters(engine.getMasterStereoMeters());
-      onConnectedInputsChange?.(engine.getConnectedChannelCount());
+      const snapshots = engine.getAllChannelSnapshots();
+      const connectedCount = engine.getConnectedChannelCount();
+      const masterMeters = engine.getMasterStereoMeters();
+      setChannels(snapshots);
+      setMasterStereoMeters(masterMeters);
+      onConnectedInputsChange?.(connectedCount);
+      const allChannelsSilent = snapshots.filter((channel) => channel.meter.rmsDb === Number.NEGATIVE_INFINITY).length;
+      if (connectedCount > 0 && allChannelsSilent === connectedCount && Date.now() - lastSilentDiagnosticAtRef.current > 5000) {
+        lastSilentDiagnosticAtRef.current = Date.now();
+        recordDiagnostic('warning', 'audio-meter', 'Entrées audio connectées mais signal numérique silencieux', {
+          connectedCount, allChannelsSilent, contextState: engine.state, sampleRate: engine.sampleRate,
+          masterLeftDb: masterMeters.left.rmsDb, masterRightDb: masterMeters.right.rmsDb,
+          channels: snapshots.filter((channel) => channel.meter.rmsDb === Number.NEGATIVE_INFINITY).map((channel) => channel.id)
+        });
+      }
     } catch (cause) {
+      recordDiagnostic('error', 'audio-meter', 'Échec de lecture des niveaux audio', cause);
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
   }, [onConnectedInputsChange]);
@@ -249,6 +264,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       onProgramStreamChange?.(engine.getProgramStream());
       setChannels(engine.getAllChannelSnapshots());
       setEngineReady(true);
+      recordDiagnostic('info', 'audio', 'Moteur audio activé dans le mixeur', { state: engine.state, sampleRate: engine.sampleRate, channels: engine.channelCount });
       await refreshInputDevices();
     } catch (cause) {
       if (engine) await engine.dispose();
@@ -256,6 +272,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       onProgramStreamChange?.(null);
       setEngineReady(false);
       setStatus('Moteur audio indisponible');
+      recordDiagnostic('fatal', 'audio', 'Impossible de démarrer le moteur audio', cause);
       setError(cause instanceof Error ? cause.message : 'Impossible de démarrer le moteur audio.');
     }
   };
