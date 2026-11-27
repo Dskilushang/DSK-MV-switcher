@@ -470,15 +470,15 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
           )}
         </div></details>
 
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x p-2">
-          <div className="flex h-full min-h-[260px] min-w-max items-stretch gap-1.5 pb-1">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain touch-pan-x touch-pan-y p-1.5">
+          <div className="flex min-h-[220px] min-w-max items-stretch gap-1 pb-1">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
             const isMediaChannel = mediaChannelsRef.current.has(channelId);
             const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
-              <article key={channelId} className="grid h-full w-[148px] shrink-0 grid-cols-[minmax(0,1fr)_10px] items-stretch gap-1.5 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900 p-2 shadow-lg">
+              <article key={channelId} className="grid min-h-[220px] w-[136px] shrink-0 grid-cols-[minmax(0,1fr)_10px] items-stretch gap-1 rounded-lg border border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900 p-1.5 shadow-lg">
                 <div className="flex min-w-0 flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-1">
                   <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
@@ -516,7 +516,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   </button>
                 )}
 
-                <div className="grid min-h-[92px] grid-cols-2 items-center gap-0.5 rounded-lg border border-slate-700/80 bg-slate-950/70 px-1.5 py-1.5">
+                <div className="grid min-h-[78px] grid-cols-2 items-center gap-0.5 rounded-lg border border-slate-700/80 bg-slate-950/70 px-1 py-1">
                   <RotaryKnob
                     label="GAIN" value={channel?.gain ?? 1} min={0} max={2} step={0.01}
                     defaultValue={1} disabled={!engineReady} colorClass="text-rose-400"
@@ -546,7 +546,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
             );
           })}
 
-            <aside className="flex h-full w-[148px] shrink-0 flex-col items-center gap-2 rounded-xl border border-amber-400/70 bg-gradient-to-b from-amber-950/40 to-slate-950 p-2 shadow-[0_0_18px_rgba(245,158,11,0.10)]">
+            <aside className="flex min-h-[220px] w-[136px] shrink-0 flex-col items-center gap-1.5 rounded-xl border border-amber-400/70 bg-gradient-to-b from-amber-950/40 to-slate-950 p-2 shadow-[0_0_18px_rgba(245,158,11,0.10)]">
               <div className="w-full text-center">
                 <strong className="block text-xs font-black tracking-wide text-amber-300">PGM MASTER</strong>
                 <span className="text-[10px] tabular-nums text-slate-400">L {formatDb(masterStereoMeters.left.rmsDb)} · R {formatDb(masterStereoMeters.right.rmsDb)}</span>
