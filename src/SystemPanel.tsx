@@ -104,7 +104,7 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [deviceItems, setDeviceItems] = useState<DeviceItem[]>([]);
   const [deviceMessage, setDeviceMessage] = useState('Actualisez la liste pour détecter les périphériques.');
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'profiles' | 'devices'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profiles' | 'devices' | 'diagnostics'>('overview');
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
   const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(() => getDiagnosticEntries());
