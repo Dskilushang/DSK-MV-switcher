@@ -117,7 +117,7 @@ function RotaryKnob({
         }}
         onDoubleClick={() => { if (!disabled) onChange(defaultValue); }}
         title="Glisser verticalement · molette · double-clic pour réinitialiser"
-        className={`relative flex h-10 w-10 touch-none items-center justify-center rounded-full border-2 border-slate-600 bg-gradient-to-br from-slate-500 via-slate-800 to-black shadow-[inset_0_2px_5px_rgba(255,255,255,0.18),0_3px_6px_rgba(0,0,0,0.55)] outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-ns-resize'}`}
+        className={`relative flex h-8 w-8 touch-none items-center justify-center rounded-full border-2 border-slate-600 bg-gradient-to-br from-slate-500 via-slate-800 to-black shadow-[inset_0_2px_5px_rgba(255,255,255,0.18),0_3px_6px_rgba(0,0,0,0.55)] outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-ns-resize'}`}
       >
         <svg viewBox="0 0 48 48" className="h-full w-full" aria-hidden="true">
           <circle cx="24" cy="24" r="17.5" fill="#171d26" stroke="#64748b" strokeWidth="1.2" />
@@ -401,15 +401,15 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
           </div>
           <div className="flex items-center gap-2">
             {!engineReady ? (
-              <button onClick={() => void activateEngine()} className="rounded bg-emerald-700 px-3 py-2 text-[10px] font-bold text-white">
+              <button onClick={() => void activateEngine()} className="rounded bg-emerald-700 px-2 py-1.5 text-[9px] font-bold text-white">
                 ACTIVER LE MOTEUR
               </button>
             ) : (
-              <button onClick={() => void refreshInputDevices()} className="rounded bg-slate-700 px-3 py-2 text-[10px] font-bold text-white">
+              <button onClick={() => void refreshInputDevices()} className="rounded bg-slate-700 px-2 py-1.5 text-[9px] font-bold text-white">
                 ACTUALISER ENTRÉES
               </button>
             )}
-            <button onClick={onClose} className="min-h-10 min-w-10 rounded bg-slate-800 px-3 text-lg text-white" aria-label="Fermer le mixeur">×</button>
+            <button onClick={onClose} className="min-h-8 min-w-8 rounded bg-slate-800 px-2 text-base text-white" aria-label="Fermer le mixeur">×</button>
           </div>
         </header>
 
@@ -425,7 +425,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
               value={multiChannelDevice}
               onChange={(event) => setMultiChannelDevice(event.target.value)}
               disabled={!engineReady || !!multiChannelGroup}
-              className="h-9 w-full min-w-0 rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
+              className="h-8 w-full min-w-0 rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
             >
               <option value="">Choisir une interface…</option>
               {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.label}</option>)}
@@ -441,7 +441,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                 setMultiChannelCount((current) => Math.min(current, CHANNEL_COUNT - nextStart + 1));
               }}
               disabled={!engineReady || !!multiChannelGroup}
-              className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
+              className="h-8 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
             >
               {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((value) => <option key={value} value={value}>CH {value}</option>)}
             </select>
@@ -452,33 +452,33 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
               value={multiChannelCount}
               onChange={(event) => setMultiChannelCount(Number(event.target.value))}
               disabled={!engineReady || !!multiChannelGroup}
-              className="h-9 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
+              className="h-8 w-full rounded border border-slate-600 bg-slate-950 px-2 text-[10px] text-white"
             >
               {Array.from({ length: CHANNEL_COUNT - multiChannelStart + 1 }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{value} {value === 1 ? 'canal' : 'canaux'}</option>)}
             </select>
           </label>
           {multiChannelGroup ? (
-            <button onClick={disconnectMultichannelDevice} className="h-9 rounded bg-red-800 px-3 text-[9px] font-bold text-white">DÉCONNECTER USB</button>
+            <button onClick={disconnectMultichannelDevice} className="h-8 rounded bg-red-800 px-2 text-[9px] font-bold text-white">DÉCONNECTER USB</button>
           ) : (
             <button
               onClick={() => void connectMultichannelDevice()}
               disabled={!engineReady || !multiChannelDevice || busyChannel !== null}
-              className="h-9 rounded bg-amber-700 px-3 text-[9px] font-bold text-white disabled:opacity-40"
+              className="h-8 rounded bg-amber-700 px-2 text-[9px] font-bold text-white disabled:opacity-40"
             >
               {busyChannel === multiChannelStart ? 'CONNEXION…' : 'CONNECTER USB'}
             </button>
           )}
         </div></details>
 
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x p-2">
-          <div className="flex h-full min-h-[260px] min-w-max items-stretch gap-1.5 pb-1">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain touch-pan-x touch-pan-y p-1.5">
+          <div className="flex min-h-[190px] min-w-max items-stretch gap-1 pb-1">
           {Array.from({ length: CHANNEL_COUNT }, (_, index) => index + 1).map((channelId) => {
             const channel = channels.find((item) => item.id === channelId);
             const isMediaChannel = mediaChannelsRef.current.has(channelId);
             const connected = streamsRef.current.has(channelId) || isMediaChannel;
             const belongsToUsbGroup = multiChannelGroup?.channelIds.includes(channelId) ?? false;
             return (
-              <article key={channelId} className="grid h-full w-[148px] shrink-0 grid-cols-[minmax(0,1fr)_10px] items-stretch gap-1.5 rounded-xl border border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900 p-2 shadow-lg">
+              <article key={channelId} className="grid min-h-[190px] w-[120px] shrink-0 grid-cols-[minmax(0,1fr)_10px] items-stretch gap-1 rounded-lg border border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900 p-1.5 shadow-lg">
                 <div className="flex min-w-0 flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-1">
                   <strong className="text-xs text-white">{channel?.name || `CH ${channelId}`}</strong>
@@ -504,19 +504,19 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                   ) : belongsToUsbGroup ? (
                     <div className="rounded bg-amber-900/70 px-1 py-2 text-center text-[9px] font-bold text-amber-200">USB · CH {multiChannelGroup?.channelIds.indexOf(channelId)! + 1}</div>
                   ) : (
-                    <button onClick={() => disconnectChannel(channelId)} className="min-h-8 w-full whitespace-normal rounded-md bg-red-800 px-1.5 py-1.5 text-center text-[9px] font-bold leading-tight text-white">DÉCONNECTER</button>
+                    <button onClick={() => disconnectChannel(channelId)} className="min-h-7 w-full whitespace-normal rounded-md bg-red-800 px-1 py-1 text-center text-[9px] font-bold leading-tight text-white">DÉCONNECTER</button>
                   )
                 ) : (
                   <button
                     onClick={() => void connectChannel(channelId)}
                     disabled={!engineReady || busyChannel !== null}
-                    className="min-h-8 w-full whitespace-normal rounded-md bg-emerald-800 px-1.5 py-1.5 text-center text-[9px] font-bold leading-tight text-white disabled:opacity-40"
+                    className="min-h-7 w-full whitespace-normal rounded-md bg-emerald-800 px-1 py-1 text-center text-[9px] font-bold leading-tight text-white disabled:opacity-40"
                   >
                     {busyChannel === channelId ? 'CONNEXION…' : 'CONNECTER'}
                   </button>
                 )}
 
-                <div className="grid min-h-[92px] grid-cols-2 items-center gap-0.5 rounded-lg border border-slate-700/80 bg-slate-950/70 px-1.5 py-1.5">
+                <div className="grid min-h-[66px] grid-cols-2 items-center gap-0.5 rounded-lg border border-slate-700/80 bg-slate-950/70 px-1 py-1">
                   <RotaryKnob
                     label="GAIN" value={channel?.gain ?? 1} min={0} max={2} step={0.01}
                     defaultValue={1} disabled={!engineReady} colorClass="text-rose-400"
@@ -536,7 +536,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
                 <button
                   onClick={() => toggleMute(channelId, !(channel?.muted ?? false))}
                   disabled={!engineReady}
-                  className={`rounded px-2 py-1.5 text-[9px] font-black disabled:opacity-40 ${channel?.muted ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-200'}`}
+                  className={`rounded px-1.5 py-1 text-[8px] font-black disabled:opacity-40 ${channel?.muted ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-200'}`}
                 >
                   {channel?.muted ? 'MUTED' : 'MUTE'}
                 </button>
@@ -546,7 +546,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
             );
           })}
 
-            <aside className="flex h-full w-[148px] shrink-0 flex-col items-center gap-2 rounded-xl border border-amber-400/70 bg-gradient-to-b from-amber-950/40 to-slate-950 p-2 shadow-[0_0_18px_rgba(245,158,11,0.10)]">
+            <aside className="flex min-h-[190px] w-[120px] shrink-0 flex-col items-center gap-1.5 rounded-xl border border-amber-400/70 bg-gradient-to-b from-amber-950/40 to-slate-950 p-2 shadow-[0_0_18px_rgba(245,158,11,0.10)]">
               <div className="w-full text-center">
                 <strong className="block text-xs font-black tracking-wide text-amber-300">PGM MASTER</strong>
                 <span className="text-[10px] tabular-nums text-slate-400">L {formatDb(masterStereoMeters.left.rmsDb)} · R {formatDb(masterStereoMeters.right.rmsDb)}</span>

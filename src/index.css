@@ -27,8 +27,8 @@
   /* Barre des effets : passe de la colonne gauche à une rangée supérieure. */
   #root > div > header + div > div:first-child {
     width: 100% !important;
-    min-height: 46px;
-    height: 46px;
+    min-height: 40px;
+    height: 40px;
     padding: 3px 6px !important;
     flex-direction: row !important;
     justify-content: space-around;
@@ -38,8 +38,8 @@
 
   #root > div > header + div > div:first-child button {
     width: auto !important;
-    min-width: 48px;
-    height: 38px;
+    min-width: 42px;
+    height: 32px;
     padding: 0 6px;
   }
 
@@ -56,8 +56,8 @@
   /* T-Bar et transitions : barre inférieure compacte. */
   #root > div > header + div > div:last-child {
     width: 100% !important;
-    height: 94px;
-    min-height: 94px;
+    height: 78px;
+    min-height: 78px;
     padding: 3px 10px !important;
     flex-direction: row !important;
     border-left: 0;
@@ -80,8 +80,8 @@
   }
 
   #root > div > header + div > div:last-child button {
-    min-width: 58px;
-    padding: 8px 10px;
+    min-width: 50px;
+    padding: 5px 7px;
   }
 
   /* Respect des zones système sur les téléphones à bords arrondis. */
@@ -114,4 +114,15 @@
     height: 58px;
     min-height: 58px;
   }
+}
+
+
+/* Compacité des panneaux secondaires uniquement : l'interface principale reste intacte. */
+@media (max-width: 900px) {
+  /* Tous les compartiments ouverts en fenêtre : DSK, média, système,
+     réglages, effets et mixeur audio. La surface principale n'est pas ciblée. */
+  #root > div > div[class*="fixed"][class*="inset-0"] > section {
+    zoom: 0.90;
+  }
+
 }
