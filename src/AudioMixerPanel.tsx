@@ -152,7 +152,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Moteur audio arrêté');
-  const lastSilentDiagnosticAtRef = useRef(0);
+  const lastMeterDiagnosticAtRef = useRef(0);
 
   const refreshMeters = useCallback(() => {
     const engine = engineRef.current;
@@ -164,20 +164,46 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       setChannels(snapshots);
       setMasterStereoMeters(masterMeters);
       onConnectedInputsChange?.(connectedCount);
-      const allChannelsSilent = snapshots.filter((channel) => channel.meter.rmsDb === Number.NEGATIVE_INFINITY).length;
-      if (connectedCount > 0 && allChannelsSilent === connectedCount && Date.now() - lastSilentDiagnosticAtRef.current > 5000) {
-        lastSilentDiagnosticAtRef.current = Date.now();
-        recordDiagnostic('warning', 'audio-meter', 'Entrées audio connectées mais signal numérique silencieux', {
-          connectedCount, allChannelsSilent, contextState: engine.state, sampleRate: engine.sampleRate,
-          masterLeftDb: masterMeters.left.rmsDb, masterRightDb: masterMeters.right.rmsDb,
-          channels: snapshots.filter((channel) => channel.meter.rmsDb === Number.NEGATIVE_INFINITY).map((channel) => channel.id)
+
+      // Capture un instantané de bout en bout toutes les 5 s, sans journaliser
+      // chaque rafraîchissement UI (120 ms).
+      if (connectedCount > 0 && Date.now() - lastMeterDiagnosticAtRef.current > 5000) {
+        lastMeterDiagnosticAtRef.current = Date.now();
+        const toDb = (value: number) => Number.isFinite(value) ? Number(value.toFixed(1)) : -120;
+        const active = snapshots.filter((channel) => channel.connected);
+        const inputSignal = active.some((channel) => channel.inputMeter.rmsDb > -60);
+        const postFaderSignal = active.some((channel) => channel.meter.rmsDb > -60);
+        const masterSignal = masterMeters.left.rmsDb > -60 || masterMeters.right.rmsDb > -60;
+        const warnings: string[] = [];
+        if (!inputSignal) warnings.push('Aucun signal détecté aux entrées pré-fader');
+        if (inputSignal && !postFaderSignal) warnings.push('Signal présent avant fader mais absent après fader');
+        if (postFaderSignal && !masterSignal) warnings.push('Signal présent sur les canaux mais absent au Master PGM');
+        recordDiagnostic(warnings.length ? 'warning' : 'info', 'audio-meter', 'Échantillon diagnostic de la chaîne audio', {
+          contextState: engine.state,
+          sampleRate: engine.sampleRate,
+          connectedCount,
+          masterGain,
+          master: {
+            left: { rmsDb: toDb(masterMeters.left.rmsDb), peakDb: toDb(masterMeters.left.peakDb) },
+            right: { rmsDb: toDb(masterMeters.right.rmsDb), peakDb: toDb(masterMeters.right.peakDb) }
+          },
+          channels: active.map((channel) => ({
+            id: channel.id,
+            name: channel.name,
+            gain: channel.gain,
+            pan: channel.pan,
+            muted: channel.muted,
+            input: { rmsDb: toDb(channel.inputMeter.rmsDb), peakDb: toDb(channel.inputMeter.peakDb) },
+            postFader: { rmsDb: toDb(channel.meter.rmsDb), peakDb: toDb(channel.meter.peakDb) }
+          })),
+          warnings
         });
       }
     } catch (cause) {
       recordDiagnostic('error', 'audio-meter', 'Échec de lecture des niveaux audio', cause);
       setError(cause instanceof Error ? cause.message : 'Lecture des niveaux audio impossible.');
     }
-  }, [onConnectedInputsChange]);
+  }, [masterGain, onConnectedInputsChange]);
 
   useEffect(() => {
     if (!engineReady || !engineRef.current) {
