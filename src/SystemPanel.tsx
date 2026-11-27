@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { clearDiagnostics, exportDiagnostics, getDiagnosticEntries, subscribeDiagnostics, type DiagnosticEntry } from './services/diagnostics';
 
 type ObsStatus = 'connected' | 'connecting' | 'disconnected' | 'error' | string;
 
@@ -106,6 +107,19 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'profiles' | 'devices'>('overview');
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
+  const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(() => getDiagnosticEntries());
+
+  useEffect(() => subscribeDiagnostics(() => setDiagnosticEntries(getDiagnosticEntries())), []);
+
+  const downloadDiagnostics = () => {
+    const blob = new Blob([exportDiagnostics()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `DSK-MV-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -223,11 +237,12 @@ export default function SystemPanel(props: SystemPanelProps) {
           <button onClick={onClose} className="min-h-10 min-w-10 rounded bg-slate-800 text-white">✕</button>
         </header>
 
-        <nav className="grid grid-cols-3 gap-1 border-b border-slate-800 bg-slate-900 p-2">
+        <nav className="grid grid-cols-4 gap-1 border-b border-slate-800 bg-slate-900 p-2">
           {([
             ['overview', 'ÉTAT SYSTÈME'],
             ['profiles', 'PROFILS'],
-            ['devices', 'PÉRIPHÉRIQUES']
+            ['devices', 'PÉRIPHÉRIQUES'],
+            ['diagnostics', 'JOURNAL LOGS']
           ] as const).map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded px-2 py-3 text-[10px] font-black ${activeTab === tab ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
               {label}
@@ -285,6 +300,36 @@ export default function SystemPanel(props: SystemPanelProps) {
                     <button onClick={() => deleteProfile(profile.id)} aria-label={`Supprimer le profil ${profile.name}`} className="rounded bg-slate-800 px-3 py-2 text-[9px] font-bold text-red-300">SUPPR.</button>
                   </div>
                 ))}
+              </div>
+            </>
+          )}
+
+          {activeTab === 'diagnostics' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <div>
+                  <h3 className="text-[10px] font-black tracking-widest text-amber-300">JOURNAL DE DIAGNOSTIC</h3>
+                  <p className="mt-1 text-[9px] text-slate-400">{diagnosticEntries.length} événement(s) conservé(s) localement · erreurs et cycle de vie inclus</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={downloadDiagnostics} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white">EXPORTER JSON</button>
+                  <button onClick={() => { clearDiagnostics(); setDiagnosticEntries(getDiagnosticEntries()); }} className="rounded bg-slate-700 px-3 py-2 text-[9px] font-black text-white">EFFACER</button>
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-500">Le journal conserve les erreurs JavaScript, promesses rejetées, événements caméra/audio, changements réseau et passages arrière-plan/premier plan. Les erreurs natives Android qui tuent le processus nécessitent encore la collecte Logcat.</p>
+              <div className="max-h-[48dvh] space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-black/40 p-2">
+                {diagnosticEntries.slice().reverse().slice(0, 100).map((entry) => (
+                  <details key={entry.id} className="rounded border border-slate-800 bg-slate-900/80 px-2 py-1">
+                    <summary className="cursor-pointer list-none">
+                      <span className={`mr-2 text-[8px] font-black uppercase ${entry.level === 'fatal' || entry.level === 'error' ? 'text-red-400' : entry.level === 'warning' ? 'text-amber-300' : 'text-sky-300'}`}>{entry.level}</span>
+                      <span className="mr-2 text-[8px] text-slate-500">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                      <span className="mr-2 text-[8px] text-slate-400">[{entry.category}]</span>
+                      <span className="text-[9px] text-slate-100">{entry.message}</span>
+                    </summary>
+                    {entry.details && <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[8px] text-slate-400">{JSON.stringify(entry.details, null, 2)}</pre>}
+                  </details>
+                ))}
+                {diagnosticEntries.length === 0 && <p className="p-4 text-center text-[10px] text-slate-500">Aucun événement enregistré pour le moment.</p>}
               </div>
             </>
           )}
