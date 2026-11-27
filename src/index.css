@@ -115,3 +115,22 @@
     min-height: 58px;
   }
 }
+
+
+/* Compacte l'interface sur les écrans mobiles sans réduire les zones tactiles critiques. */
+@media (max-width: 900px) {
+  #root {
+    font-size: 90%;
+  }
+
+  #root button,
+  #root select,
+  #root input:not([type="range"]) {
+    font-size: 0.9em;
+  }
+
+  #root button {
+    padding-top: max(0.25rem, 3px);
+    padding-bottom: max(0.25rem, 3px);
+  }
+}
