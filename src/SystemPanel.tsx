@@ -110,6 +110,8 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
   const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(() => getDiagnosticEntries());
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
+  const [diagnosticExportMessage, setDiagnosticExportMessage] = useState('');
   const lastNativeLogRef = useRef('');
 
   useEffect(() => subscribeDiagnostics(() => setDiagnosticEntries(getDiagnosticEntries())), []);
@@ -127,14 +129,40 @@ export default function SystemPanel(props: SystemPanelProps) {
     return () => { cancelled = true; };
   }, [open]);
 
-  const downloadDiagnostics = () => {
-    const blob = new Blob([exportDiagnostics()], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `DSK-MV-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  const downloadDiagnostics = async () => {
+    if (isExportingDiagnostics) return;
+    setIsExportingDiagnostics(true);
+    setDiagnosticExportMessage('');
+    try {
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+        const nativeLog = await DskStreaming.getNativeCrashLog();
+        if (nativeLog.content.trim() && lastNativeLogRef.current !== nativeLog.content) {
+          lastNativeLogRef.current = nativeLog.content;
+          recordDiagnostic('fatal', 'android-native', 'Journal natif Android inclus dans le rapport exporté', { nativeLog: nativeLog.content });
+        }
+        const fileName = `DSK-MV-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        const result = await DskStreaming.saveDiagnosticReport({ json: exportDiagnostics(), fileName });
+        if (!result.saved) throw new Error("Android n'a pas confirmé l'enregistrement du rapport.");
+        setDiagnosticExportMessage(`Rapport enregistré : ${result.location}/${result.fileName}`);
+      } else {
+        const blob = new Blob([exportDiagnostics()], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `DSK-MV-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        setDiagnosticExportMessage('Export lancé. Vérifiez le dossier Téléchargements.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDiagnosticExportMessage(`Échec de l’export : ${message}`);
+      recordDiagnostic('error', 'diagnostics-export', 'Échec de l’export du rapport JSON', error);
+    } finally {
+      setIsExportingDiagnostics(false);
+    }
   };
 
   useEffect(() => {
@@ -328,7 +356,7 @@ export default function SystemPanel(props: SystemPanelProps) {
                   <p className="mt-1 text-[9px] text-slate-400">{diagnosticEntries.length} événement(s) conservé(s) localement · erreurs et cycle de vie inclus</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={downloadDiagnostics} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white">EXPORTER JSON</button>
+                  <button onClick={() => void downloadDiagnostics()} disabled={isExportingDiagnostics} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white disabled:opacity-50">{isExportingDiagnostics ? 'EXPORT…' : 'EXPORTER JSON'}</button>
                   <button onClick={() => {
                     clearDiagnostics();
                     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
@@ -338,6 +366,7 @@ export default function SystemPanel(props: SystemPanelProps) {
                   }} className="rounded bg-slate-700 px-3 py-2 text-[9px] font-black text-white">EFFACER</button>
                 </div>
               </div>
+              {diagnosticExportMessage && <p role="status" className="break-words rounded border border-slate-700 bg-slate-900 p-2 text-[10px] text-sky-200">{diagnosticExportMessage}</p>}
               <p className="text-[9px] text-slate-500">Le journal conserve les erreurs JavaScript, promesses rejetées, événements caméra/audio, changements réseau et passages arrière-plan/premier plan. Les exceptions Java/Kotlin non interceptées sont aussi conservées côté Android et récupérées à la prochaine ouverture. Les arrêts forcés par le système (OOM killer) et les crashs natifs bas niveau peuvent rester invisibles à l’application.</p>
               <div className="max-h-[48dvh] space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-black/40 p-2">
                 {diagnosticEntries.slice().reverse().slice(0, 100).map((entry) => (
