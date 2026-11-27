@@ -7,9 +7,43 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import android.os.Process
+import kotlin.system.exitProcess
 
 @CapacitorPlugin(name = "DskStreaming")
 class DskStreamingPlugin : Plugin() {
+    private var previousExceptionHandler: Thread.UncaughtExceptionHandler? = null
+
+    override fun load() {
+        super.load()
+        DskNativeDiagnostics.append(context, "INFO", "Plugin natif DSK-MV chargé")
+        previousExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            DskNativeDiagnostics.append(context, "FATAL", "Exception non interceptée sur le thread ${thread.name}", error)
+            val previous = previousExceptionHandler
+            if (previous != null) {
+                previous.uncaughtException(thread, error)
+            } else {
+                Process.killProcess(Process.myPid())
+                exitProcess(10)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun getNativeCrashLog(call: PluginCall) {
+        try {
+            call.resolve(JSObject().put("content", DskNativeDiagnostics.read(context)))
+        } catch (error: Exception) {
+            call.reject("Lecture du journal natif impossible", error)
+        }
+    }
+
+    @PluginMethod
+    fun clearNativeCrashLog(call: PluginCall) {
+        DskNativeDiagnostics.clear(context)
+        call.resolve(JSObject().put("cleared", true))
+    }
     @PluginMethod
     fun startBackgroundService(call: PluginCall) {
         val title = call.getString("title") ?: DskStreamingService.DEFAULT_TITLE

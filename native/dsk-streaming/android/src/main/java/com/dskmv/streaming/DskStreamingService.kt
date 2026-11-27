@@ -19,21 +19,29 @@ class DskStreamingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        DskNativeDiagnostics.append(this, "INFO", "Service LIVE Android créé")
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            DskNativeDiagnostics.append(this, "INFO", "Commande arrêt reçue par le service LIVE")
             stopSelf()
             return START_NOT_STICKY
         }
 
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: DEFAULT_TITLE
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: DEFAULT_TEXT
-        startAsForeground(buildNotification(title, text))
-        acquireSessionLocks()
-        isRunning = true
-        return START_STICKY
+        try {
+            startAsForeground(buildNotification(title, text))
+            acquireSessionLocks()
+            isRunning = true
+            DskNativeDiagnostics.append(this, "INFO", "Service LIVE démarré", null)
+            return START_STICKY
+        } catch (error: Exception) {
+            DskNativeDiagnostics.append(this, "FATAL", "Échec démarrage service LIVE", error)
+            throw error
+        }
     }
 
     private fun startAsForeground(notification: Notification) {
@@ -117,6 +125,7 @@ class DskStreamingService : Service() {
     }
 
     override fun onDestroy() {
+        DskNativeDiagnostics.append(this, "WARNING", "Service LIVE Android détruit")
         isRunning = false
         releaseSessionLocks()
         super.onDestroy()

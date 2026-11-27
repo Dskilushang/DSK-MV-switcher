@@ -8,8 +8,17 @@ import AudioMixerPanel, { type MediaAudioRoute } from './AudioMixerPanel';
 import SystemPanel from './SystemPanel';
 import { CameraLanReceiver, type CameraReceiverStatus } from './video/CameraLanReceiver';
 import { connectObs, disconnectObs, getSceneList, getObsStreamActive, registerCallbacks, setProgramScene, startObsStream, stopObsStream, type ObsStatus } from './services/obsService';
+import { installDiagnosticListeners, recordDiagnostic } from './services/diagnostics';
 
 export default function App() {
+  useEffect(() => {
+    const uninstall = installDiagnosticListeners();
+    recordDiagnostic('info', 'app', 'Interface React montée');
+    return () => {
+      recordDiagnostic('info', 'app', 'Interface React démontée');
+      uninstall();
+    };
+  }, []);
   // --- ÉTATS DU MÉLANGEUR ---
   const [programChannel, setProgramChannel] = useState(1);
   const [previewChannel, setPreviewChannel] = useState(2);
@@ -304,6 +313,12 @@ export default function App() {
         audio: false
       });
       setCameraStream(stream);
+      stream.getVideoTracks().forEach((track) => {
+        recordDiagnostic('info', 'camera', 'Piste caméra activée', { label: track.label, readyState: track.readyState, settings: track.getSettings() });
+        track.addEventListener('ended', () => recordDiagnostic('error', 'camera', 'Piste caméra terminée', { label: track.label }));
+        track.addEventListener('mute', () => recordDiagnostic('warning', 'camera', 'Piste caméra mise en pause par le système', { label: track.label }));
+        track.addEventListener('unmute', () => recordDiagnostic('info', 'camera', 'Piste caméra réactivée', { label: track.label }));
+      });
       setCameraStatus('active');
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Échec de l'activation de la caméra.");
@@ -314,6 +329,7 @@ export default function App() {
         OverconstrainedError: "La caméra arrière demandée n'est pas disponible."
       };
       setCameraStatus('error');
+      recordDiagnostic('error', 'camera', 'Échec activation caméra', { name: error.name, message: error.message, stack: error.stack });
       setCameraError(messages[error.name] || error.message || "Impossible d'activer la caméra.");
     }
   };
