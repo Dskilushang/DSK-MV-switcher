@@ -40,6 +40,10 @@ export interface DskStreamingPlugin extends Plugin {
   stopBackgroundService(): Promise<{ stopped: boolean }>;
   getBackgroundServiceStatus(): Promise<{ running: boolean }>;
   probeH264SurfaceEncoder(options?: H264EncoderProbeOptions): Promise<H264EncoderProbeResult>;
+  /** Read uncaught native Android exceptions persisted by the previous process session. */
+  getNativeCrashLog(): Promise<{ content: string }>;
+  /** Clear the persisted native Android exception log after it has been exported. */
+  clearNativeCrashLog(): Promise<{ cleared: boolean }>;
 }
 
 export declare const DskStreaming: DskStreamingPlugin;
