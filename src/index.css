@@ -117,20 +117,16 @@
 }
 
 
-/* Compacte l'interface sur les écrans mobiles sans réduire les zones tactiles critiques. */
+/* Compacité des panneaux secondaires uniquement : l'interface principale reste intacte. */
 @media (max-width: 900px) {
-  #root {
-    font-size: 85%;
+  /* Tous les compartiments ouverts en fenêtre : DSK, média, système,
+     réglages, effets et mixeur audio. La surface principale n'est pas ciblée. */
+  #root > div > div[class*="fixed"][class*="inset-0"] > section {
+    zoom: 0.90;
   }
 
-  #root button,
-  #root select,
-  #root input:not([type="range"]) {
-    font-size: 0.85em;
-  }
-
-  #root button {
-    padding-top: 3px;
-    padding-bottom: 3px;
+  /* Les fenêtres sans <section> dédiée conservent une typographie compacte. */
+  #root > div > div[class*="fixed"][class*="inset-0"] > div {
+    zoom: 0.90;
   }
 }
