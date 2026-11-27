@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clearDiagnostics, exportDiagnostics, getDiagnosticEntries, recordDiagnostic, subscribeDiagnostics, type DiagnosticEntry } from './services/diagnostics';
 import { Capacitor } from '@capacitor/core';
 import { DskStreaming } from '@dsk-mv/native-streaming';
@@ -110,7 +110,7 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
   const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(() => getDiagnosticEntries());
-  const lastNativeLogRef = useState({ value: '' })[0];
+  const lastNativeLogRef = useRef('');
 
   useEffect(() => subscribeDiagnostics(() => setDiagnosticEntries(getDiagnosticEntries())), []);
 
@@ -118,14 +118,14 @@ export default function SystemPanel(props: SystemPanelProps) {
     if (!open || !Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
     let cancelled = false;
     void DskStreaming.getNativeCrashLog().then(({ content }) => {
-      if (cancelled || !content.trim() || lastNativeLogRef.value === content) return;
-      lastNativeLogRef.value = content;
+      if (cancelled || !content.trim() || lastNativeLogRef.current === content) return;
+      lastNativeLogRef.current = content;
       recordDiagnostic('fatal', 'android-native', 'Journal natif Android récupéré depuis le stockage de la session précédente', { nativeLog: content });
     }).catch((error) => {
       if (!cancelled) recordDiagnostic('warning', 'android-native', 'Lecture du journal natif Android impossible', error);
     });
     return () => { cancelled = true; };
-  }, [open, lastNativeLogRef]);
+  }, [open]);
 
   const downloadDiagnostics = () => {
     const blob = new Blob([exportDiagnostics()], { type: 'application/json' });
