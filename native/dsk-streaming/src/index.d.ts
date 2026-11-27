@@ -40,6 +40,8 @@ export interface DskStreamingPlugin extends Plugin {
   stopBackgroundService(): Promise<{ stopped: boolean }>;
   getBackgroundServiceStatus(): Promise<{ running: boolean }>;
   probeH264SurfaceEncoder(options?: H264EncoderProbeOptions): Promise<H264EncoderProbeResult>;
+  /** Save a complete JSON diagnostics report to the public Downloads/DSK-MV folder on Android 10+. */
+  saveDiagnosticsReport(options: { filename: string; content: string }): Promise<{ saved: boolean; uri: string; filename: string }>;
   /** Read uncaught native Android exceptions persisted by the previous process session. */
   getNativeCrashLog(): Promise<{ content: string }>;
   /** Clear the persisted native Android exception log after it has been exported. */
