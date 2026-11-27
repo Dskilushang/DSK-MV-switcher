@@ -67,6 +67,12 @@ export class AudioEngine {
     this.ownsContext = !options.context;
     this.context = options.context ?? new AudioContext({ latencyHint: 'interactive' });
     recordDiagnostic('info', 'audio', 'AudioEngine créé', { state: this.context.state, sampleRate: this.context.sampleRate, channelCount });
+    this.context.addEventListener('statechange', () => recordDiagnostic(
+      this.context.state === 'running' ? 'info' : 'warning',
+      'audio',
+      'État AudioContext modifié',
+      { state: this.context.state, sampleRate: this.context.sampleRate }
+    ));
     this.masterGain = this.context.createGain();
     this.masterAnalyser = this.context.createAnalyser();
     this.masterAnalyser.fftSize = 2048;
