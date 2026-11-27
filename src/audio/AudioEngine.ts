@@ -53,12 +53,15 @@ export class AudioEngine {
   private readonly channels = new Map<number, ChannelGraph>();
   private readonly mediaElementSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
   private readonly masterGain: GainNode;
+  private readonly monitorGain: GainNode;
   private readonly masterAnalyser: AnalyserNode;
   private readonly masterSplitter: ChannelSplitterNode;
   private readonly masterLeftAnalyser: AnalyserNode;
   private readonly masterRightAnalyser: AnalyserNode;
   private readonly programDestination: MediaStreamAudioDestinationNode;
   private disposed = false;
+  private monitorEnabled = false;
+  private monitorLevel = 0.18;
 
   constructor(options: AudioEngineOptions = {}) {
     const channelCount = options.channelCount ?? DEFAULT_AUDIO_CHANNEL_COUNT;
@@ -76,6 +79,8 @@ export class AudioEngine {
       { state: this.context.state, sampleRate: this.context.sampleRate }
     ));
     this.masterGain = this.context.createGain();
+    this.monitorGain = this.context.createGain();
+    this.monitorGain.gain.value = 0;
     this.masterAnalyser = this.context.createAnalyser();
     this.masterAnalyser.fftSize = 2048;
     this.masterSplitter = this.context.createChannelSplitter(2);
@@ -87,6 +92,9 @@ export class AudioEngine {
 
     this.masterGain.connect(this.masterAnalyser);
     this.masterAnalyser.connect(this.programDestination);
+    // Independent local-monitor branch; muted by default to prevent acoustic feedback.
+    this.masterGain.connect(this.monitorGain);
+    this.monitorGain.connect(this.context.destination);
     this.masterGain.connect(this.masterSplitter);
     this.masterSplitter.connect(this.masterLeftAnalyser, 0);
     this.masterSplitter.connect(this.masterRightAnalyser, 1);
@@ -169,8 +177,8 @@ export class AudioEngine {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
       audio: deviceId
-        ? { deviceId: { exact: deviceId }, channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-        : { channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        ? { deviceId: { exact: deviceId }, channelCount: { ideal: requestedChannels }, echoCancellation: true, noiseSuppression: true, autoGainControl: false }
+        : { channelCount: { ideal: requestedChannels }, echoCancellation: true, noiseSuppression: true, autoGainControl: false },
       video: false
       });
       const tracks = stream.getAudioTracks().map((track) => ({ id: track.id, label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState, settings: track.getSettings() }));
@@ -318,6 +326,24 @@ export class AudioEngine {
     recordDiagnostic('debug', 'audio-mix', 'Gain Master modifié', { gain });
   }
 
+  setMonitorEnabled(enabled: boolean): void {
+    this.assertActive();
+    this.monitorEnabled = enabled;
+    this.monitorGain.gain.setTargetAtTime(enabled ? this.monitorLevel : 0, this.context.currentTime, 0.03);
+    recordDiagnostic('info', 'audio-monitor', enabled ? 'Monitoring local activé' : 'Monitoring local désactivé', {
+      enabled, level: enabled ? this.monitorLevel : 0, contextState: this.context.state
+    });
+  }
+
+  setMonitorLevel(level: number): void {
+    if (!Number.isFinite(level) || level < 0 || level > 0.5) {
+      throw new RangeError('Monitor level must be between 0 and 0.5.');
+    }
+    this.monitorLevel = level;
+    this.monitorGain.gain.setTargetAtTime(this.monitorEnabled ? level : 0, this.context.currentTime, 0.03);
+    recordDiagnostic('debug', 'audio-monitor', 'Niveau de monitoring modifié', { level, enabled: this.monitorEnabled });
+  }
+
   getChannelSnapshot(channelId: number): AudioChannelSnapshot {
     const channel = this.getChannel(channelId);
     return {
@@ -372,6 +398,7 @@ export class AudioEngine {
     }
 
     this.masterGain.disconnect();
+    this.monitorGain.disconnect();
     this.masterAnalyser.disconnect();
     this.masterSplitter.disconnect();
     this.masterLeftAnalyser.disconnect();
