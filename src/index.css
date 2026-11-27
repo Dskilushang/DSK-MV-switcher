@@ -125,8 +125,4 @@
     zoom: 0.90;
   }
 
-  /* Les fenêtres sans <section> dédiée conservent une typographie compacte. */
-  #root > div > div[class*="fixed"][class*="inset-0"] > div {
-    zoom: 0.90;
-  }
 }
