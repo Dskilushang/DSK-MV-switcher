@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { clearDiagnostics, exportDiagnostics, getDiagnosticEntries, subscribeDiagnostics, type DiagnosticEntry } from './services/diagnostics';
+import { clearDiagnostics, exportDiagnostics, getDiagnosticEntries, recordDiagnostic, subscribeDiagnostics, type DiagnosticEntry } from './services/diagnostics';
+import { Capacitor } from '@capacitor/core';
+import { DskStreaming } from '@dsk-mv/native-streaming';
 
 type ObsStatus = 'connected' | 'connecting' | 'disconnected' | 'error' | string;
 
@@ -108,8 +110,22 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
   const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(() => getDiagnosticEntries());
+  const lastNativeLogRef = useState({ value: '' })[0];
 
   useEffect(() => subscribeDiagnostics(() => setDiagnosticEntries(getDiagnosticEntries())), []);
+
+  useEffect(() => {
+    if (!open || !Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+    let cancelled = false;
+    void DskStreaming.getNativeCrashLog().then(({ content }) => {
+      if (cancelled || !content.trim() || lastNativeLogRef.value === content) return;
+      lastNativeLogRef.value = content;
+      recordDiagnostic('fatal', 'android-native', 'Journal natif Android récupéré depuis le stockage de la session précédente', { nativeLog: content });
+    }).catch((error) => {
+      if (!cancelled) recordDiagnostic('warning', 'android-native', 'Lecture du journal natif Android impossible', error);
+    });
+    return () => { cancelled = true; };
+  }, [open, lastNativeLogRef]);
 
   const downloadDiagnostics = () => {
     const blob = new Blob([exportDiagnostics()], { type: 'application/json' });
@@ -313,10 +329,16 @@ export default function SystemPanel(props: SystemPanelProps) {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={downloadDiagnostics} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white">EXPORTER JSON</button>
-                  <button onClick={() => { clearDiagnostics(); setDiagnosticEntries(getDiagnosticEntries()); }} className="rounded bg-slate-700 px-3 py-2 text-[9px] font-black text-white">EFFACER</button>
+                  <button onClick={() => {
+                    clearDiagnostics();
+                    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+                      void DskStreaming.clearNativeCrashLog().catch((error) => recordDiagnostic('warning', 'android-native', 'Impossible d’effacer le journal natif', error));
+                    }
+                    setDiagnosticEntries(getDiagnosticEntries());
+                  }} className="rounded bg-slate-700 px-3 py-2 text-[9px] font-black text-white">EFFACER</button>
                 </div>
               </div>
-              <p className="text-[9px] text-slate-500">Le journal conserve les erreurs JavaScript, promesses rejetées, événements caméra/audio, changements réseau et passages arrière-plan/premier plan. Les erreurs natives Android qui tuent le processus nécessitent encore la collecte Logcat.</p>
+              <p className="text-[9px] text-slate-500">Le journal conserve les erreurs JavaScript, promesses rejetées, événements caméra/audio, changements réseau et passages arrière-plan/premier plan. Les exceptions Java/Kotlin non interceptées sont aussi conservées côté Android et récupérées à la prochaine ouverture. Les arrêts forcés par le système (OOM killer) et les crashs natifs bas niveau peuvent rester invisibles à l’application.</p>
               <div className="max-h-[48dvh] space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-black/40 p-2">
                 {diagnosticEntries.slice().reverse().slice(0, 100).map((entry) => (
                   <details key={entry.id} className="rounded border border-slate-800 bg-slate-900/80 px-2 py-1">
