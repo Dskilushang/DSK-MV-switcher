@@ -1,3 +1,5 @@
+import { recordDiagnostic } from '../services/diagnostics';
+
 export type AudioMeterReading = {
   /** RMS level in dBFS. -Infinity means digital silence. */
   rmsDb: number;
@@ -64,6 +66,7 @@ export class AudioEngine {
 
     this.ownsContext = !options.context;
     this.context = options.context ?? new AudioContext({ latencyHint: 'interactive' });
+    recordDiagnostic('info', 'audio', 'AudioEngine créé', { state: this.context.state, sampleRate: this.context.sampleRate, channelCount });
     this.masterGain = this.context.createGain();
     this.masterAnalyser = this.context.createAnalyser();
     this.masterAnalyser.fftSize = 2048;
@@ -115,7 +118,14 @@ export class AudioEngine {
 
   async resume(): Promise<void> {
     this.assertActive();
-    if (this.context.state === 'suspended') await this.context.resume();
+    const before = this.context.state;
+    try {
+      if (before === 'suspended') await this.context.resume();
+      recordDiagnostic(this.context.state === 'running' ? 'info' : 'warning', 'audio', 'AudioContext resume terminé', { before, after: this.context.state, sampleRate: this.context.sampleRate });
+    } catch (error) {
+      recordDiagnostic('error', 'audio', 'Échec de reprise AudioContext', error);
+      throw error;
+    }
   }
 
   async suspend(): Promise<void> {
@@ -148,12 +158,25 @@ export class AudioEngine {
       throw new Error('Audio capture is not available in this Android/WebView context.');
     }
 
-    return navigator.mediaDevices.getUserMedia({
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
       audio: deviceId
         ? { deviceId: { exact: deviceId }, channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
         : { channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       video: false
-    });
+      });
+      const tracks = stream.getAudioTracks().map((track) => ({ id: track.id, label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState, settings: track.getSettings() }));
+      recordDiagnostic('info', 'audio-input', 'Capture microphone obtenue', { deviceId: deviceId ? 'selected-device' : 'default-device', requestedChannels, trackCount: tracks.length, tracks });
+      stream.getAudioTracks().forEach((track) => {
+        track.addEventListener('ended', () => recordDiagnostic('error', 'audio-input', 'Piste microphone terminée', { trackId: track.id, label: track.label }));
+        track.addEventListener('mute', () => recordDiagnostic('warning', 'audio-input', 'Piste microphone muette par le système', { trackId: track.id }));
+        track.addEventListener('unmute', () => recordDiagnostic('info', 'audio-input', 'Piste microphone réactivée', { trackId: track.id }));
+      });
+      return stream;
+    } catch (error) {
+      recordDiagnostic('error', 'audio-input', 'Échec getUserMedia audio', { error, deviceId: deviceId ? 'selected-device' : 'default-device', requestedChannels });
+      throw error;
+    }
   }
 
   connectMediaElement(channelId: number, element: HTMLMediaElement): void {
@@ -167,6 +190,7 @@ export class AudioEngine {
     this.disconnectInput(channelId);
     channel.source = { node: source, outputIndex: 0 };
     source.connect(channel.inputGain);
+    recordDiagnostic('info', 'audio-route', 'Élément média connecté au mixeur', { channelId, mediaTag: element.tagName, muted: element.muted, volume: element.volume, readyState: element.readyState, paused: element.paused });
   }
 
   connectInput(channelId: number, stream: MediaStream): void {
@@ -181,6 +205,7 @@ export class AudioEngine {
     const source = this.context.createMediaStreamSource(stream);
     channel.source = { node: source, outputIndex: 0 };
     source.connect(channel.inputGain);
+    recordDiagnostic('info', 'audio-route', 'Entrée audio connectée au canal', { channelId, audioTrackCount: audioTracks.length, tracks: audioTracks.map((track) => ({ label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState })) });
   }
 
   /**
@@ -246,6 +271,7 @@ export class AudioEngine {
       // The route may already have been disconnected during stream replacement.
     }
     channel.source = null;
+    recordDiagnostic('info', 'audio-route', 'Entrée audio déconnectée', { channelId });
   }
 
   setChannelName(channelId: number, name: string): void {
@@ -281,6 +307,7 @@ export class AudioEngine {
       throw new RangeError('Master gain must be between 0 and 2.');
     }
     this.masterGain.gain.setTargetAtTime(gain, this.context.currentTime, 0.015);
+    recordDiagnostic('debug', 'audio-mix', 'Gain Master modifié', { gain });
   }
 
   getChannelSnapshot(channelId: number): AudioChannelSnapshot {
@@ -342,7 +369,9 @@ export class AudioEngine {
     this.programDestination.disconnect();
 
     if (this.ownsContext && this.context.state !== 'closed') {
+      const previousState = this.context.state;
       await this.context.close();
+      recordDiagnostic('info', 'audio', 'AudioContext fermé lors du dispose', { previousState });
     }
   }
 
