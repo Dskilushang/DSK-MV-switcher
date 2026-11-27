@@ -44,6 +44,8 @@ export interface DskStreamingPlugin extends Plugin {
   getNativeCrashLog(): Promise<{ content: string }>;
   /** Clear the persisted native Android exception log after it has been exported. */
   clearNativeCrashLog(): Promise<{ cleared: boolean }>;
+  /** Save a JSON diagnostic report to the Android Downloads/DSK-MV folder. */
+  saveDiagnosticReport(options: { json: string; fileName: string }): Promise<{ saved: boolean; fileName: string; uri: string; location: string }>;
 }
 
 export declare const DskStreaming: DskStreamingPlugin;
