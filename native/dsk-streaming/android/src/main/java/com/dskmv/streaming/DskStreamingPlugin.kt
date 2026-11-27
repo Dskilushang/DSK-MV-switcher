@@ -75,20 +75,21 @@ class DskStreamingPlugin : Plugin() {
         var reportUri: android.net.Uri? = null
         try {
             val resolver = context.contentResolver
-            reportUri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                 ?: throw IllegalStateException("Android n'a pas créé le fichier dans Téléchargements.")
-            resolver.openOutputStream(reportUri)?.use { output ->
+            reportUri = uri
+            resolver.openOutputStream(uri)?.use { output ->
                 output.write(json.toByteArray(Charsets.UTF_8))
                 output.flush()
             } ?: throw IllegalStateException("Impossible d'ouvrir le fichier JSON.")
             val completed = ContentValues().apply {
                 put(MediaStore.Downloads.IS_PENDING, 0)
             }
-            resolver.update(reportUri, completed, null, null)
+            resolver.update(uri, completed, null, null)
             call.resolve(JSObject().apply {
                 put("saved", true)
                 put("fileName", safeName)
-                put("uri", reportUri.toString())
+                put("uri", uri.toString())
                 put("location", "Téléchargements/DSK-MV")
             })
         } catch (error: Exception) {
