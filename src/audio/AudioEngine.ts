@@ -12,9 +12,11 @@ export type IsoTapPoint = 'pre-fader' | 'post-fader';
 export type AudioChannelSnapshot = {
   id: number;
   name: string;
+  connected: boolean;
   gain: number;
   pan: number;
   muted: boolean;
+  inputMeter: AudioMeterReading;
   meter: AudioMeterReading;
 };
 
@@ -321,9 +323,11 @@ export class AudioEngine {
     return {
       id: channel.id,
       name: channel.name,
+      connected: channel.source !== null,
       gain: channel.gain,
       pan: channel.pan,
       muted: channel.muted,
+      inputMeter: this.readMeter(channel.preFaderAnalyser),
       meter: this.readMeter(channel.analyser)
     };
   }
