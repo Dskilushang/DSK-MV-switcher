@@ -1,7 +1,10 @@
 package com.dskmv.streaming
 
 import android.content.Intent
+import android.content.ContentValues
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -44,6 +47,56 @@ class DskStreamingPlugin : Plugin() {
         DskNativeDiagnostics.clear(context)
         call.resolve(JSObject().put("cleared", true))
     }
+
+    /** Saves a diagnostic JSON report to the public Android Downloads collection. */
+    @PluginMethod
+    fun saveDiagnosticReport(call: PluginCall) {
+        val json = call.getString("json")
+        if (json.isNullOrBlank()) {
+            call.reject("Le rapport de diagnostic est vide.")
+            return
+        }
+        val requestedName = call.getString("fileName") ?: "DSK-MV-diagnostics.json"
+        val safeName = requestedName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .let { if (it.endsWith(".json")) it else "$it.json" }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            call.reject("L'enregistrement direct dans Téléchargements nécessite Android 10 ou supérieur.")
+            return
+        }
+
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, safeName)
+            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/DSK-MV")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+
+        var reportUri: android.net.Uri? = null
+        try {
+            val resolver = context.contentResolver
+            reportUri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Android n'a pas créé le fichier dans Téléchargements.")
+            resolver.openOutputStream(reportUri)?.use { output ->
+                output.write(json.toByteArray(Charsets.UTF_8))
+                output.flush()
+            } ?: throw IllegalStateException("Impossible d'ouvrir le fichier JSON.")
+            val completed = ContentValues().apply {
+                put(MediaStore.Downloads.IS_PENDING, 0)
+            }
+            resolver.update(reportUri, completed, null, null)
+            call.resolve(JSObject().apply {
+                put("saved", true)
+                put("fileName", safeName)
+                put("uri", reportUri.toString())
+                put("location", "Téléchargements/DSK-MV")
+            })
+        } catch (error: Exception) {
+            reportUri?.let { try { context.contentResolver.delete(it, null, null) } catch (_: Exception) { } }
+            call.reject("Échec de l'enregistrement du rapport JSON dans Téléchargements.", error)
+        }
+    }
+
     @PluginMethod
     fun startBackgroundService(call: PluginCall) {
         val title = call.getString("title") ?: DskStreamingService.DEFAULT_TITLE
