@@ -149,7 +149,11 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
   const silentMeter: AudioMeterReading = { rmsDb: Number.NEGATIVE_INFINITY, peakDb: Number.NEGATIVE_INFINITY };
   const [masterStereoMeters, setMasterStereoMeters] = useState<{ left: AudioMeterReading; right: AudioMeterReading }>({ left: silentMeter, right: silentMeter });
   const [masterGain, setMasterGain] = useState(1);
+  const [monitorEnabled, setMonitorEnabled] = useState(false);
+  const [monitorLevel, setMonitorLevel] = useState(0.18);
   const [busyChannel, setBusyChannel] = useState<number | null>(null);
+  const captureOperationRef = useRef(false);
+  const engineActivationRef = useRef(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Moteur audio arrêté');
   const lastMeterDiagnosticAtRef = useRef(0);
@@ -256,7 +260,8 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
 
   const refreshInputDevices = async () => {
     const engine = engineRef.current;
-    if (!engine) return;
+    if (!engine || captureOperationRef.current) return;
+    captureOperationRef.current = true;
     setError('');
     let permissionError: unknown = null;
     try {
@@ -275,11 +280,14 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de récupérer les entrées audio.');
+    } finally {
+      captureOperationRef.current = false;
     }
   };
 
   const activateEngine = async () => {
-    if (engineRef.current) return;
+    if (engineRef.current || engineActivationRef.current) return;
+    engineActivationRef.current = true;
     setError('');
     setStatus('Initialisation du moteur audio…');
     let engine: AudioEngine | null = null;
@@ -300,21 +308,32 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       setStatus('Moteur audio indisponible');
       recordDiagnostic('fatal', 'audio', 'Impossible de démarrer le moteur audio', cause);
       setError(cause instanceof Error ? cause.message : 'Impossible de démarrer le moteur audio.');
+    } finally {
+      engineActivationRef.current = false;
     }
   };
 
   const connectChannel = async (channelId: number) => {
+    if (captureOperationRef.current) {
+      setError('Une opération de capture audio est déjà en cours. Attendez sa fin avant de changer de source.');
+      return;
+    }
+    captureOperationRef.current = true;
+    let pendingStream: MediaStream | null = null;
     const engine = engineRef.current;
     const deviceId = selectedDevices[channelId];
     if (!engine) {
+      captureOperationRef.current = false;
       setError('Démarrez d’abord le moteur audio.');
       return;
     }
     if (mediaChannelsRef.current.has(channelId)) {
+      captureOperationRef.current = false;
       setError(`CH ${channelId} est réservé à MEDIA. Déconnectez MEDIA avant d’utiliser cette tranche.`);
       return;
     }
     if (!deviceId) {
+      captureOperationRef.current = false;
       setError(`Sélectionnez une entrée audio pour CH ${channelId}.`);
       return;
     }
@@ -322,33 +341,46 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     setBusyChannel(channelId);
     setError('');
     try {
-      const stream = await engine.requestInputStream(deviceId);
+      pendingStream = await engine.requestInputStream(deviceId);
+      if (engineRef.current !== engine) throw new Error('Le moteur audio a changé pendant la capture.');
       const previous = streamsRef.current.get(channelId);
-      engine.connectInput(channelId, stream);
-      streamsRef.current.set(channelId, stream);
+      engine.connectInput(channelId, pendingStream);
+      streamsRef.current.set(channelId, pendingStream);
+      pendingStream = null;
       previous?.getTracks().forEach((track) => track.stop());
       refreshMeters();
       setStatus(`CH ${channelId} connecté`);
     } catch (cause) {
+      pendingStream?.getTracks().forEach((track) => track.stop());
       setError(cause instanceof Error ? cause.message : `Connexion de CH ${channelId} impossible.`);
+      recordDiagnostic('error', 'audio-input', 'Connexion de source audio échouée', { channelId, error: cause });
     } finally {
+      captureOperationRef.current = false;
       setBusyChannel(null);
     }
   };
 
   const connectMultichannelDevice = async () => {
+    if (captureOperationRef.current) {
+      setError('Une opération de capture audio est déjà en cours. Attendez sa fin.');
+      return;
+    }
+    captureOperationRef.current = true;
     const engine = engineRef.current;
     if (!engine) {
+      captureOperationRef.current = false;
       setError('Démarrez d’abord le moteur audio.');
       return;
     }
     if (!multiChannelDevice) {
+      captureOperationRef.current = false;
       setError('Sélectionnez une interface USB multicanale.');
       return;
     }
 
     const channelIds = Array.from({ length: multiChannelCount }, (_, index) => multiChannelStart + index);
     if (channelIds.some((channelId) => streamsRef.current.has(channelId) || mediaChannelsRef.current.has(channelId))) {
+      captureOperationRef.current = false;
       setError('Une ou plusieurs tranches choisies sont déjà occupées. Libérez-les avant le raccordement USB.');
       return;
     }
@@ -374,6 +406,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       stream?.getTracks().forEach((track) => track.stop());
       setError(cause instanceof Error ? cause.message : 'Connexion USB multicanale impossible.');
     } finally {
+      captureOperationRef.current = false;
       setBusyChannel(null);
     }
   };
@@ -434,6 +467,26 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
     refreshMeters();
   };
 
+  const toggleLocalMonitor = async () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    try {
+      if (!monitorEnabled) await engine.resume();
+      engine.setMonitorEnabled(!monitorEnabled);
+      setMonitorEnabled(!monitorEnabled);
+      recordDiagnostic('info', 'audio-monitor', 'Commande de monitoring locale', { enabled: !monitorEnabled, level: monitorLevel });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Sortie de monitoring indisponible.');
+      recordDiagnostic('error', 'audio-monitor', 'Échec activation monitoring local', cause);
+    }
+  };
+
+  const updateMonitorLevel = (value: number) => {
+    const safeLevel = Math.max(0, Math.min(0.5, value));
+    engineRef.current?.setMonitorLevel(safeLevel);
+    setMonitorLevel(safeLevel);
+  };
+
   return (
     <div className={open ? 'fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-2' : 'hidden'}>
       <section className="flex h-full max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
@@ -457,6 +510,23 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
         </header>
 
         {error && <div role="alert" className="border-b border-red-900 bg-red-950/70 px-3 py-2 text-[10px] text-red-200">{error}</div>}
+
+        {engineReady && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2">
+            <button
+              onClick={() => void toggleLocalMonitor()}
+              className={`rounded px-3 py-2 text-[10px] font-black text-white ${monitorEnabled ? 'bg-emerald-700' : 'bg-slate-700'}`}
+            >
+              ÉCOUTE LOCALE · {monitorEnabled ? 'ON' : 'OFF'}
+            </button>
+            <label className="flex min-w-[130px] flex-1 items-center gap-2 text-[9px] text-slate-300">
+              <span>NIVEAU</span>
+              <input aria-label="Niveau de monitoring local" type="range" min="0" max="0.5" step="0.01" value={monitorLevel} onChange={(event) => updateMonitorLevel(Number(event.target.value))} className="min-w-0 flex-1" />
+              <span className="w-8 text-right tabular-nums">{Math.round(monitorLevel * 100)}%</span>
+            </label>
+            <span className="w-full text-[9px] text-amber-300">Casque recommandé. Le haut-parleur du téléphone peut créer un Larsen avec les microphones.</span>
+          </div>
+        )}
 
         <AudioNetworkPanel engine={engineRef.current} enabled={engineReady} />
 
