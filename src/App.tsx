@@ -334,6 +334,14 @@ export default function App() {
     }
   };
 
+  const stopCamera = () => {
+    cameraStream?.getTracks().forEach((track) => track.stop());
+    setCameraStream(null);
+    setCameraStatus('idle');
+    setCameraError('');
+    recordDiagnostic('info', 'camera', 'Caméra locale désactivée manuellement');
+  };
+
   useEffect(() => {
     if (!cameraStream || !localVideoRef.current) return;
     const video = localVideoRef.current;
@@ -352,23 +360,47 @@ export default function App() {
   }, [cameraStream]);
 
   // --- RÉCEPTION DES CAMÉRAS DISTANTES ---
-  const connectRemoteCameras = () => {
+  const createCameraReceiver = () => new CameraLanReceiver(
+    (status) => {
+      setCameraReceiverStatuses((current) => ({ ...current, [status.cameraId]: status.state }));
+      if (status.state === 'error') setCameraReceiverMessage(`CAM ${status.cameraId} : ${status.message || 'Erreur vidéo.'}`);
+    },
+    (cameraId, stream) => setRemoteCameraStreams((current) => ({ ...current, [cameraId]: stream }))
+  );
+
+  const connectRemoteCamera = (cameraId: number) => {
     try {
-      void cameraReceiverRef.current?.disconnect();
-      const receiver = new CameraLanReceiver(
-        (status) => {
-          setCameraReceiverStatuses((current) => ({ ...current, [status.cameraId]: status.state }));
-          if (status.state === 'error') setCameraReceiverMessage(`CAM ${status.cameraId} : ${status.message || 'Erreur vidéo.'}`);
-        },
-        (cameraId, stream) => setRemoteCameraStreams((current) => ({ ...current, [cameraId]: stream }))
-      );
-      receiver.connect(cameraReceiverHost, Number(cameraReceiverPort), cameraReceiverToken);
-      cameraReceiverRef.current = receiver;
-      setCameraReceiverStatuses({});
-      setCameraReceiverMessage('Recherche des téléphones DSK Camera sur le réseau local…');
+      if (!cameraReceiverHost.trim() || cameraReceiverToken.trim().length < 16) {
+        throw new Error('Renseignez l’adresse IP, le port et le code d’association dans les réglages vidéo.');
+      }
+      let receiver = cameraReceiverRef.current;
+      if (!receiver) {
+        receiver = createCameraReceiver();
+        cameraReceiverRef.current = receiver;
+      }
+      receiver.connectCamera(cameraId, cameraReceiverHost, Number(cameraReceiverPort), cameraReceiverToken);
+      setCameraReceiverMessage(`Connexion de CAM ${cameraId} demandée.`);
     } catch (error) {
       setCameraReceiverMessage(error instanceof Error ? error.message : 'Connexion vidéo impossible.');
     }
+  };
+
+  const connectRemoteCameras = () => {
+    try {
+      void cameraReceiverRef.current?.disconnect();
+      const receiver = createCameraReceiver();
+      cameraReceiverRef.current = receiver;
+      receiver.connect(cameraReceiverHost, Number(cameraReceiverPort), cameraReceiverToken, [2, 3, 4]);
+      setCameraReceiverStatuses({});
+      setCameraReceiverMessage('Recherche des sources DSK Camera CAM 2 à CAM 4…');
+    } catch (error) {
+      setCameraReceiverMessage(error instanceof Error ? error.message : 'Connexion vidéo impossible.');
+    }
+  };
+
+  const disconnectRemoteCamera = (cameraId: number) => {
+    cameraReceiverRef.current?.disconnectCamera(cameraId);
+    setCameraReceiverMessage(`CAM ${cameraId} déconnectée.`);
   };
 
   const disconnectRemoteCameras = () => {
@@ -958,20 +990,21 @@ export default function App() {
               {previewChannel === 9 && !mediaUrl && <span className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">Aucun média chargé</span>}
             </div>
           </div>
-          <div className="flex-1 min-h-0 grid grid-cols-4 grid-rows-2 gap-1 overflow-hidden">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => {
+          <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 overflow-hidden">
+          {[1, 2, 3, 4].map((channel) => {
             const isP = programChannel === channel;
             const isV = previewChannel === channel;
             return (
               <div key={channel} onClick={() => !isFrozen && !isAutoTransitioning && setPreviewChannel(channel)} className={`relative bg-slate-900 rounded border-2 ${isP ? 'border-red-500' : isV ? 'border-green-500' : 'border-slate-800'} overflow-hidden cursor-pointer pointer-events-auto`}>
                 {channel === 1 ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-                    {cameraStream ? <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /> : <div className="z-20 flex flex-col items-center gap-1 px-1"><button onClick={(event) => { event.stopPropagation(); void startCamera(); }} disabled={cameraStatus === 'requesting'} className="bg-red-600 disabled:bg-slate-600 text-white px-2 py-1 rounded text-[10px] pointer-events-auto">{cameraStatus === 'requesting' ? 'Activation…' : 'Activer'}</button>{cameraError && <span role="alert" className="max-w-full text-center text-[8px] leading-tight text-red-300">{cameraError}</span>}</div>}
+                    {cameraStream ? <video ref={localVideoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /> : <div className="z-20 flex flex-col items-center gap-1 px-1"><span className="text-[9px] text-slate-400">{cameraStatus === 'error' ? 'ERREUR CAMÉRA' : 'CAMÉRA LOCALE INACTIVE'}</span><button onClick={(event) => { event.stopPropagation(); void startCamera(); }} disabled={cameraStatus === 'requesting'} className="bg-red-600 disabled:bg-slate-600 text-white px-2 py-1 rounded text-[10px] pointer-events-auto">{cameraStatus === 'requesting' ? 'Activation…' : cameraStatus === 'error' ? 'Réessayer' : 'Activer'}</button>{cameraError && <span role="alert" className="max-w-full text-center text-[8px] leading-tight text-red-300">{cameraError}</span>}</div>}
+                    {cameraStream && <button onClick={(event) => { event.stopPropagation(); stopCamera(); }} className="absolute bottom-1 left-1 z-20 bg-slate-800/90 text-white px-2 py-1 rounded text-[9px]">Désactiver</button>}
                   </div>
                 ) : remoteCameraStreams[channel] ? (
-                  <video ref={(el) => { remoteVideoRefs.current[channel] = el; }} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                  <><video ref={(el) => { remoteVideoRefs.current[channel] = el; }} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" /><button onClick={(event) => { event.stopPropagation(); disconnectRemoteCamera(channel); }} className="absolute bottom-1 left-1 z-20 bg-slate-800/90 text-white px-2 py-1 rounded text-[9px]">Désactiver</button></>
                 ) : (
-                  <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?q=80&w=300&auto=format&fit=crop')] bg-cover bg-center" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-slate-900"><span className="text-[9px] text-slate-500">{cameraReceiverStatuses[channel] === 'error' ? 'ERREUR DE LIAISON' : cameraReceiverStatuses[channel] === 'connecting' ? 'CONNEXION…' : 'SOURCE DISTANTE INACTIVE'}</span><button onClick={(event) => { event.stopPropagation(); connectRemoteCamera(channel); }} disabled={cameraReceiverStatuses[channel] === 'connecting'} className="z-20 bg-sky-700 disabled:opacity-50 text-white px-2 py-1 rounded text-[9px]">{cameraReceiverStatuses[channel] === 'error' ? 'Réessayer' : 'Activer'}</button></div>
                 )}
                 <div className="absolute top-0.5 left-0.5 bg-black/60 px-1 rounded text-[8px] font-bold z-10 pointer-events-none">CAM {channel}</div>
                 {isP && <div className="absolute bottom-0.5 right-0.5 bg-red-600 px-1 rounded text-[8px] font-bold z-10 pointer-events-none">PGM</div>}
@@ -1184,8 +1217,8 @@ export default function App() {
 
             <div className="mb-4 bg-slate-900 p-3 rounded border border-slate-700 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-bold text-sky-300">DSK VIDEO · CAM 2 À CAM 8</p>
-                <span className="text-[9px] text-slate-400">{Object.values(cameraReceiverStatuses).filter((status) => status === 'connected').length}/7 reçues</span>
+                <p className="text-xs font-bold text-sky-300">DSK VIDEO · CAM 2 À CAM 4</p>
+                <span className="text-[9px] text-slate-400">{[2, 3, 4].filter((id) => cameraReceiverStatuses[id] === 'connected').length}/3 reçues</span>
               </div>
               <label className="block text-[10px] text-slate-400">IP DU PC DSK RECEIVER</label>
               <input type="text" value={cameraReceiverHost} onChange={(e) => setCameraReceiverHost(e.target.value)} placeholder="192.168.1.100" className="w-full bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
@@ -1194,11 +1227,11 @@ export default function App() {
               <label className="block text-[10px] text-slate-400">CODE D’ASSOCIATION</label>
               <input type="password" autoComplete="off" value={cameraReceiverToken} onChange={(e) => setCameraReceiverToken(e.target.value)} placeholder="Code affiché sur le PC" className="w-full bg-slate-800 text-white text-xs px-2 py-2 rounded border border-slate-600" />
               <div className="flex gap-2">
-                <button onClick={connectRemoteCameras} disabled={!cameraReceiverHost.trim() || cameraReceiverToken.trim().length < 16} className="flex-1 bg-sky-700 disabled:opacity-40 text-white py-2 rounded text-[10px] font-bold">CONNECTER CAM 2–8</button>
+                <button onClick={connectRemoteCameras} disabled={!cameraReceiverHost.trim() || cameraReceiverToken.trim().length < 16} className="flex-1 bg-sky-700 disabled:opacity-40 text-white py-2 rounded text-[10px] font-bold">CONNECTER CAM 2–4</button>
                 <button onClick={disconnectRemoteCameras} className="flex-1 bg-slate-700 text-white py-2 rounded text-[10px] font-bold">DÉCONNECTER</button>
               </div>
               <div className="grid grid-cols-4 gap-1">
-                {[2,3,4,5,6,7,8].map((cam) => (
+                {[2,3,4].map((cam) => (
                   <div key={cam} className="rounded bg-slate-800 px-2 py-1 text-[9px] flex items-center gap-1">
                     <span className={`w-2 h-2 rounded-full ${cameraReceiverStatuses[cam] === 'connected' ? 'bg-emerald-400' : cameraReceiverStatuses[cam] === 'error' ? 'bg-red-400' : 'bg-slate-600'}`} />
                     <span>CAM {cam}</span>
@@ -1206,7 +1239,7 @@ export default function App() {
                 ))}
               </div>
               <p className="text-[9px] text-slate-400">{cameraReceiverMessage}</p>
-              <p className="text-[9px] text-amber-300">Sur chaque téléphone : ouvrez http://IP_DU_PC:8765/camera, choisissez CAM 2 à CAM 8 et saisissez le code. L’accès caméra du navigateur exige HTTPS ou l’application native DSK Camera ; une simple page HTTP sur IP locale peut être bloquée par Android.</p>
+              <p className="text-[9px] text-amber-300">Sur chaque téléphone : ouvrez DSK Camera, choisissez CAM 2, CAM 3 ou CAM 4 et saisissez le code. L’accès caméra du navigateur exige HTTPS ou l’application native DSK Camera ; une simple page HTTP sur IP locale peut être bloquée par Android.</p>
             </div>
             
             <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded font-bold mt-2">
