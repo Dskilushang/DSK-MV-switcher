@@ -177,8 +177,8 @@ export class AudioEngine {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
       audio: deviceId
-        ? { deviceId: { exact: deviceId }, channelCount: { ideal: requestedChannels }, echoCancellation: { ideal: true }, noiseSuppression: { ideal: true }, autoGainControl: false }
-        : { channelCount: { ideal: requestedChannels }, echoCancellation: { ideal: true }, noiseSuppression: { ideal: true }, autoGainControl: false },
+        ? { deviceId: { exact: deviceId }, channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        : { channelCount: { ideal: requestedChannels }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       video: false
       });
       const tracks = stream.getAudioTracks().map((track) => ({ id: track.id, label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState, settings: track.getSettings() }));
