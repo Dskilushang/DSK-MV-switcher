@@ -19,6 +19,7 @@ const CAMERA_IDS = [2, 3, 4, 5, 6, 7, 8] as const;
 export class CameraLanReceiver {
   private sessions = new Map<number, CameraSession>();
   private stopped = false;
+  private connectionConfig: { host: string; port: number; token: string } | null = null;
   private readonly onStatus: (status: CameraReceiverStatus) => void;
   private readonly onStream: (cameraId: number, stream: MediaStream | null) => void;
 
@@ -30,7 +31,7 @@ export class CameraLanReceiver {
     this.onStream = onStream;
   }
 
-  connect(host: string, port: number, token: string): void {
+  connect(host: string, port: number, token: string, cameraIds: number[] = [2, 3, 4]): void {
     void this.disconnect();
     this.stopped = false;
 
@@ -45,16 +46,31 @@ export class CameraLanReceiver {
       throw new Error('Le code d’association doit contenir au moins 16 caractères.');
     }
 
-    for (const cameraId of CAMERA_IDS) {
-      this.openSession(cleanHost, port, token.trim(), cameraId);
+    this.connectionConfig = { host: cleanHost, port, token: token.trim() };
+    const uniqueCameraIds = [...new Set(cameraIds)];
+    if (uniqueCameraIds.some((id) => !CAMERA_IDS.includes(id as typeof CAMERA_IDS[number]))) {
+      throw new Error('Identifiant de caméra distante invalide.');
     }
+    for (const cameraId of uniqueCameraIds) this.openSession(cleanHost, port, token.trim(), cameraId);
   }
 
-  async disconnect(): Promise<void> {
-    this.stopped = true;
-    const sessions = [...this.sessions.values()];
-    this.sessions.clear();
-    for (const session of sessions) {
+  connectCamera(cameraId: number): void {
+    if (!this.connectionConfig) throw new Error('Configurez d’abord le Receiver vidéo.');
+    if (!CAMERA_IDS.includes(cameraId as typeof CAMERA_IDS[number])) throw new Error('Identifiant de caméra distante invalide.');
+    this.disconnectCamera(cameraId);
+    this.stopped = false;
+    const { host, port, token } = this.connectionConfig;
+    this.openSession(host, port, token, cameraId);
+  }
+
+  reconnectCamera(cameraId: number): void {
+    this.connectCamera(cameraId);
+  }
+
+  disconnectCamera(cameraId: number): void {
+    const session = this.sessions.get(cameraId);
+    if (session) {
+      this.sessions.delete(cameraId);
       session.socket.onclose = null;
       session.socket.onerror = null;
       session.socket.onmessage = null;
@@ -62,12 +78,16 @@ export class CameraLanReceiver {
       session.peer.ontrack = null;
       session.peer.onconnectionstatechange = null;
       session.peer.close();
-      if (session.socket.readyState === WebSocket.OPEN || session.socket.readyState === WebSocket.CONNECTING) {
-        session.socket.close();
-      }
-      this.onStream(session.cameraId, null);
-      this.onStatus({ cameraId: session.cameraId, state: 'disconnected' });
+      if (session.socket.readyState === WebSocket.OPEN || session.socket.readyState === WebSocket.CONNECTING) session.socket.close();
     }
+    this.onStream(cameraId, null);
+    this.onStatus({ cameraId, state: 'disconnected' });
+  }
+
+  async disconnect(): Promise<void> {
+    this.stopped = true;
+    for (const cameraId of [...this.sessions.keys()]) this.disconnectCamera(cameraId);
+    this.connectionConfig = null;
   }
 
   private openSession(host: string, port: number, token: string, cameraId: number): void {
