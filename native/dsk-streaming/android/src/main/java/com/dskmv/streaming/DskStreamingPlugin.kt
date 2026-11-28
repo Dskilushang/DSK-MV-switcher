@@ -12,10 +12,18 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import android.os.Process
+import android.net.Uri
+import android.util.Base64
 import kotlin.system.exitProcess
 
 @CapacitorPlugin(name = "DskStreaming")
 class DskStreamingPlugin : Plugin() {
+    private val videoRecordingLock = Any()
+    private var videoRecordingUri: Uri? = null
+    private var videoRecordingOutput: OutputStream? = null
+    private var videoRecordingFilename: String? = null
+    private var videoRecordingBytes: Long = 0L
+
     private var previousExceptionHandler: Thread.UncaughtExceptionHandler? = null
 
     override fun load() {
@@ -72,6 +80,170 @@ class DskStreamingPlugin : Plugin() {
         } catch (error: Exception) {
             call.reject("Échec de l’enregistrement du rapport JSON dans Téléchargements/DSK-MV.", error)
         }
+    }
+
+    /**
+     * Creates a pending MediaStore video and keeps its output stream open.
+     * MediaRecorder chunks are appended incrementally to avoid holding the full
+     * recording (or a full-file base64 copy) in the WebView heap.
+     */
+    @PluginMethod
+    fun beginVideoRecording(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            call.reject("La sauvegarde vidéo native nécessite Android 10 ou supérieur.")
+            return
+        }
+        val filename = call.getString("filename")
+            ?.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            ?.take(100)
+            ?.takeIf { it.endsWith(".webm", ignoreCase = true) }
+            ?: "DSK-MV-${System.currentTimeMillis()}.webm"
+        val mimeType = call.getString("mimeType")
+            ?.takeIf { it.startsWith("video/webm", ignoreCase = true) }
+            ?: "video/webm"
+
+        Thread({
+            var createdUri: Uri? = null
+            try {
+                synchronized(videoRecordingLock) {
+                    if (videoRecordingOutput != null || videoRecordingUri != null) {
+                        throw IllegalStateException("Un enregistrement REC natif est déjà en cours.")
+                    }
+                }
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/DSK-MV")
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val resolver = context.contentResolver
+                createdUri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                    ?: throw IllegalStateException("Android n’a pas créé le fichier vidéo dans Movies/DSK-MV.")
+                val output = resolver.openOutputStream(createdUri, "w")
+                    ?: throw IllegalStateException("Impossible d’ouvrir le fichier vidéo MediaStore.")
+                synchronized(videoRecordingLock) {
+                    videoRecordingUri = createdUri
+                    videoRecordingOutput = output
+                    videoRecordingFilename = filename
+                    videoRecordingBytes = 0L
+                }
+                DskNativeDiagnostics.append(context, "INFO", "Fichier REC MediaStore préparé : $filename")
+                call.resolve(JSObject().put("started", true).put("filename", filename))
+            } catch (error: Exception) {
+                createdUri?.let { context.contentResolver.delete(it, null, null) }
+                DskNativeDiagnostics.append(context, "ERROR", "Préparation du fichier REC impossible", error)
+                call.reject("Impossible de préparer le fichier REC dans Movies/DSK-MV.", error)
+            }
+        }, "DSK-REC-Begin").start()
+    }
+
+    @PluginMethod
+    fun appendVideoRecordingChunk(call: PluginCall) {
+        val encoded = call.getString("base64")
+        if (encoded.isNullOrEmpty()) {
+            call.reject("Le bloc vidéo REC est vide.")
+            return
+        }
+        Thread({
+            try {
+                val bytes = Base64.decode(encoded, Base64.DEFAULT)
+                if (bytes.isEmpty()) throw IllegalArgumentException("Le bloc vidéo décodé est vide.")
+                synchronized(videoRecordingLock) {
+                    val output = videoRecordingOutput
+                        ?: throw IllegalStateException("Aucun fichier REC natif ouvert.")
+                    output.write(bytes)
+                    videoRecordingBytes += bytes.size
+                }
+                call.resolve(JSObject().put("written", bytes.size))
+            } catch (error: Exception) {
+                DskNativeDiagnostics.append(context, "ERROR", "Écriture d’un bloc REC impossible", error)
+                call.reject("Échec d’écriture d’un bloc vidéo REC.", error)
+            }
+        }, "DSK-REC-Append").start()
+    }
+
+    @PluginMethod
+    fun finishVideoRecording(call: PluginCall) {
+        Thread({
+            var uri: Uri? = null
+            var filename = "DSK-MV-recording.webm"
+            var bytesWritten = 0L
+            try {
+                synchronized(videoRecordingLock) {
+                    uri = videoRecordingUri ?: throw IllegalStateException("Aucun fichier REC à finaliser.")
+                    filename = videoRecordingFilename ?: filename
+                    bytesWritten = videoRecordingBytes
+                    val output = videoRecordingOutput ?: throw IllegalStateException("Flux de sortie REC indisponible.")
+                    output.flush()
+                    output.close()
+                    videoRecordingOutput = null
+                    videoRecordingUri = null
+                    videoRecordingFilename = null
+                    videoRecordingBytes = 0L
+                }
+
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                val resolver = context.contentResolver
+                val updated = resolver.update(uri!!, values, null, null)
+                if (updated <= 0) throw IllegalStateException("Android n’a pas publié le fichier REC dans MediaStore.")
+
+                var persistedBytes = 0L
+                resolver.query(uri!!, arrayOf(MediaStore.MediaColumns.SIZE), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                        if (index >= 0) persistedBytes = cursor.getLong(index)
+                    }
+                }
+                if (persistedBytes <= 0L || bytesWritten <= 0L) {
+                    throw IllegalStateException("Le fichier REC publié est vide ou sa taille n’a pas pu être vérifiée.")
+                }
+
+                DskNativeDiagnostics.append(context, "INFO", "Fichier REC sauvegardé : $filename ($persistedBytes octets)")
+                call.resolve(
+                    JSObject()
+                        .put("saved", true)
+                        .put("uri", uri.toString())
+                        .put("filename", filename)
+                        .put("bytes", persistedBytes)
+                )
+            } catch (error: Exception) {
+                uri?.let { context.contentResolver.delete(it, null, null) }
+                synchronized(videoRecordingLock) {
+                    try { videoRecordingOutput?.close() } catch (_: Exception) {}
+                    videoRecordingOutput = null
+                    videoRecordingUri = null
+                    videoRecordingFilename = null
+                    videoRecordingBytes = 0L
+                }
+                DskNativeDiagnostics.append(context, "ERROR", "Finalisation du fichier REC impossible", error)
+                call.reject("Échec de finalisation du fichier REC dans Movies/DSK-MV.", error)
+            }
+        }, "DSK-REC-Finish").start()
+    }
+
+    @PluginMethod
+    fun abortVideoRecording(call: PluginCall) {
+        Thread({
+            var uri: Uri? = null
+            try {
+                synchronized(videoRecordingLock) {
+                    uri = videoRecordingUri
+                    try { videoRecordingOutput?.close() } catch (_: Exception) {}
+                    videoRecordingOutput = null
+                    videoRecordingUri = null
+                    videoRecordingFilename = null
+                    videoRecordingBytes = 0L
+                }
+                uri?.let { context.contentResolver.delete(it, null, null) }
+                DskNativeDiagnostics.append(context, "WARNING", "Fichier REC temporaire annulé")
+                call.resolve(JSObject().put("aborted", true))
+            } catch (error: Exception) {
+                DskNativeDiagnostics.append(context, "ERROR", "Nettoyage du fichier REC temporaire impossible", error)
+                call.reject("Impossible de supprimer le fichier REC temporaire.", error)
+            }
+        }, "DSK-REC-Abort").start()
     }
 
     @PluginMethod

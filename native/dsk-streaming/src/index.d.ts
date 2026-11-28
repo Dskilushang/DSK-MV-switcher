@@ -35,7 +35,37 @@ export interface H264EncoderProbeResult {
   detail: string | null;
 }
 
+export interface VideoRecordingStartOptions {
+  filename: string;
+  mimeType: string;
+}
+
+export interface VideoRecordingStartResult {
+  started: boolean;
+  filename: string;
+}
+
+export interface VideoRecordingChunkOptions {
+  /** Base64-encoded bytes for one MediaRecorder dataavailable chunk. */
+  base64: string;
+}
+
+export interface VideoRecordingFinishResult {
+  saved: boolean;
+  uri: string;
+  filename: string;
+  bytes: number;
+}
+
 export interface DskStreamingPlugin extends Plugin {
+  /** Create a pending WebM entry in Movies/DSK-MV on Android 10+. */
+  beginVideoRecording(options: VideoRecordingStartOptions): Promise<VideoRecordingStartResult>;
+  /** Append one small MediaRecorder chunk to the pending native file. */
+  appendVideoRecordingChunk(options: VideoRecordingChunkOptions): Promise<{ written: number }>;
+  /** Finalize the MediaStore entry and confirm its persisted size. */
+  finishVideoRecording(): Promise<VideoRecordingFinishResult>;
+  /** Delete an unfinished pending recording after an error. */
+  abortVideoRecording(): Promise<{ aborted: boolean }>;
   startBackgroundService(options?: BackgroundStreamOptions): Promise<{ started: boolean }>;
   stopBackgroundService(): Promise<{ stopped: boolean }>;
   getBackgroundServiceStatus(): Promise<{ running: boolean }>;

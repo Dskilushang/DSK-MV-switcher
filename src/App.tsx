@@ -227,6 +227,9 @@ export default function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingVideoStreamRef = useRef<MediaStream | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
+  const nativeRecordingRef = useRef(false);
+  const recordingWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const recordingErrorRef = useRef<string | null>(null);
   const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
   const chromaAnimationRef = useRef<number | null>(null);
 
@@ -791,15 +794,22 @@ export default function App() {
   };
 
   // --- ENREGISTREMENT PGM VIDÉO + AUDIO STÉRÉO ---
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (isRecording) {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch (error) {
+          recordDiagnostic('error', 'recording', 'Échec de l’arrêt REC', error);
+          setRecordingMessage(error instanceof Error ? error.message : 'Impossible d’arrêter REC.');
+        }
       }
       return;
     }
 
-    if (!programCanvasRef.current) {
+    const canvas = programCanvasRef.current;
+    if (!canvas) {
       setRecordingMessage('Canvas PGM indisponible.');
       return;
     }
@@ -808,72 +818,196 @@ export default function App() {
       return;
     }
 
-    let videoStream: MediaStream | null = null;
-    try {
-      videoStream = programCanvasRef.current.captureStream(30);
-      recordingVideoStreamRef.current = videoStream;
-      const audioTracks = connectedAudioInputs > 0 ? (programAudioStream?.getAudioTracks() || []) : [];
-      recordDiagnostic('info', 'recording', 'Démarrage REC demandé', {
+    const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+    const availableAudioTracks = programAudioStream?.getAudioTracks() ?? [];
+    const audioTracks = availableAudioTracks.filter((track) =>
+      track.readyState === 'live' && track.enabled && !track.muted
+    );
+    if (connectedAudioInputs > 0 && audioTracks.length === 0) {
+      recordDiagnostic('error', 'recording', 'REC refusé : entrées audio déclarées mais piste PGM indisponible', {
         connectedAudioInputs,
-        programAudioTracks: audioTracks.map((track) => ({ label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState })),
-        videoTracks: videoStream.getVideoTracks().map((track) => ({ readyState: track.readyState, settings: track.getSettings() }))
+        availableTracks: availableAudioTracks.map((track) => ({
+          label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState
+        }))
       });
-      const recordingStream = new MediaStream([
-        ...videoStream.getVideoTracks(),
-        ...audioTracks
-      ]);
-      const mimeType = [
+      setRecordingMessage('REC annulé : aucune piste audio PGM active. Vérifiez le mixeur audio.');
+      return;
+    }
+
+    let videoStream: MediaStream | null = null;
+    let nativeSaveStarted = false;
+    try {
+      videoStream = canvas.captureStream(30);
+      recordingVideoStreamRef.current = videoStream;
+      const videoTracks = videoStream.getVideoTracks().filter((track) => track.readyState === 'live');
+      if (videoTracks.length === 0) throw new Error('Aucune piste vidéo PGM active.');
+
+      recordDiagnostic('info', 'recording', 'Démarrage REC demandé', {
+        platform: Capacitor.getPlatform(),
+        nativeSave: isAndroidNative,
+        connectedAudioInputs,
+        programAudioTracks: availableAudioTracks.map((track) => ({
+          label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState,
+          settings: track.getSettings()
+        })),
+        selectedAudioTrackCount: audioTracks.length,
+        videoTracks: videoTracks.map((track) => ({
+          readyState: track.readyState, settings: track.getSettings()
+        }))
+      });
+
+      const recordingStream = new MediaStream([...videoTracks, ...audioTracks]);
+      const supportedMimeType = [
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
         'video/webm'
       ].find((type) => MediaRecorder.isTypeSupported(type));
-      const recorder = mimeType
-        ? new MediaRecorder(recordingStream, { mimeType })
+      const recorder = supportedMimeType
+        ? new MediaRecorder(recordingStream, { mimeType: supportedMimeType })
         : new MediaRecorder(recordingStream);
+      const filename = `DSK-MV_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+
+      recordedChunks.current = [];
+      recordingErrorRef.current = null;
+      recordingWriteQueueRef.current = Promise.resolve();
+      nativeRecordingRef.current = false;
+
+      if (isAndroidNative) {
+        const result = await DskStreaming.beginVideoRecording({
+          filename,
+          mimeType: recorder.mimeType || supportedMimeType || 'video/webm'
+        });
+        if (!result.started) throw new Error('Android n’a pas pu préparer le fichier REC.');
+        nativeSaveStarted = true;
+        nativeRecordingRef.current = true;
+        recordDiagnostic('info', 'recording', 'Fichier REC Android préparé dans Movies/DSK-MV', {
+          filename: result.filename, mimeType: recorder.mimeType
+        });
+      }
 
       mediaRecorderRef.current = recorder;
-      recordedChunks.current = [];
-      setRecordingMessage(audioTracks.length
-        ? `REC · PGM vidéo + audio stéréo · ${connectedAudioInputs} entrée(s) connectée(s)`
-        : 'REC · vidéo seule · aucune entrée audio connectée');
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordedChunks.current.push(event.data);
-      };
-      recorder.onerror = (event) => {
-        recordDiagnostic('error', 'recording', 'Erreur MediaRecorder pendant la capture', {
-          error: event instanceof Event ? event.type : String(event), state: recorder.state, mimeType: recorder.mimeType
-        });
-        setRecordingMessage('Erreur MediaRecorder pendant la capture.');
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(recordedChunks.current, { type: recorder.mimeType || 'video/webm' });
-        recordDiagnostic(blob.size > 0 ? 'info' : 'error', 'recording', 'Enregistrement REC terminé', {
-          blobSize: blob.size, chunkCount: recordedChunks.current.length, mimeType: recorder.mimeType, finalState: recorder.state
-        });
-        if (blob.size > 0) {
-          const url = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.download = `DSK-MV_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-          anchor.click();
-          window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-          setRecordingMessage('Enregistrement terminé · fichier WebM téléchargé.');
-        } else {
-          setRecordingMessage('Enregistrement vide : aucune donnée reçue.');
+        if (event.data.size <= 0) return;
+        if (!nativeRecordingRef.current) {
+          recordedChunks.current.push(event.data);
+          return;
         }
-        recordingVideoStreamRef.current?.getTracks().forEach((track) => track.stop());
-        recordingVideoStreamRef.current = null;
-        mediaRecorderRef.current = null;
-        setIsRecording(false);
+
+        // Transfert par petits blocs : ne jamais convertir le Blob complet en base64.
+        recordingWriteQueueRef.current = recordingWriteQueueRef.current.then(async () => {
+          const buffer = await event.data.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          const segmentSize = 0x8000;
+          for (let offset = 0; offset < bytes.length; offset += segmentSize) {
+            binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + segmentSize, bytes.length)));
+          }
+          await DskStreaming.appendVideoRecordingChunk({ base64: btoa(binary) });
+        }).catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          recordingErrorRef.current = message;
+          recordDiagnostic('error', 'recording', 'Échec d’écriture d’un bloc REC dans MediaStore', { message, chunkSize: event.data.size });
+          const activeRecorder = mediaRecorderRef.current;
+          if (activeRecorder && activeRecorder.state !== 'inactive') {
+            try { activeRecorder.stop(); } catch { /* onstop nettoiera les ressources */ }
+          }
+        });
       };
+
+      recorder.onerror = (event) => {
+        const message = event instanceof Event ? event.type : String(event);
+        recordingErrorRef.current = message;
+        recordDiagnostic('error', 'recording', 'Erreur MediaRecorder pendant la capture', {
+          error: message, state: recorder.state, mimeType: recorder.mimeType
+        });
+        setRecordingMessage('Erreur MediaRecorder. Fermeture sécurisée de REC…');
+        if (recorder.state !== 'inactive') {
+          try { recorder.stop(); } catch (error) {
+            recordDiagnostic('error', 'recording', 'Impossible de fermer MediaRecorder après erreur', error);
+          }
+        }
+      };
+
+      recorder.onstop = () => {
+        void (async () => {
+          let saved = false;
+          try {
+            if (nativeRecordingRef.current) {
+              await recordingWriteQueueRef.current;
+              if (recordingErrorRef.current) throw new Error(recordingErrorRef.current);
+              const result = await DskStreaming.finishVideoRecording();
+              nativeRecordingRef.current = false;
+              saved = result.saved && result.bytes > 0;
+              recordDiagnostic(saved ? 'info' : 'error', 'recording', 'Finalisation REC Android terminée', {
+                saved: result.saved, uri: result.uri, filename: result.filename, bytes: result.bytes,
+                audioTrackCount: audioTracks.length, mimeType: recorder.mimeType
+              });
+              if (!saved) throw new Error('Android n’a pas confirmé une écriture vidéo non vide.');
+              setRecordingMessage(`REC sauvegardé · Movies/DSK-MV · ${result.filename}`);
+            } else {
+              const blob = new Blob(recordedChunks.current, { type: recorder.mimeType || 'video/webm' });
+              recordDiagnostic(blob.size > 0 ? 'info' : 'error', 'recording', 'Enregistrement REC terminé', {
+                blobSize: blob.size, chunkCount: recordedChunks.current.length, mimeType: recorder.mimeType,
+                audioTrackCount: audioTracks.length, finalState: recorder.state
+              });
+              if (blob.size <= 0) throw new Error('Enregistrement vide : aucune donnée reçue.');
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = filename;
+              anchor.click();
+              window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+              saved = true;
+              setRecordingMessage('Enregistrement terminé · téléchargement WebM demandé au navigateur.');
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            recordDiagnostic('error', 'recording', 'Échec de finalisation ou de sauvegarde REC', { message });
+            if (nativeRecordingRef.current || nativeSaveStarted) {
+              try { await DskStreaming.abortVideoRecording(); } catch (abortError) {
+                recordDiagnostic('error', 'recording', 'Échec du nettoyage du fichier REC temporaire', abortError);
+              }
+            }
+            nativeRecordingRef.current = false;
+            setRecordingMessage(`Échec REC : ${message}`);
+          } finally {
+            // Seules les pistes vidéo créées par captureStream appartiennent à REC.
+            recordingVideoStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+            recordingVideoStreamRef.current = null;
+            mediaRecorderRef.current = null;
+            recordedChunks.current = [];
+            recordingWriteQueueRef.current = Promise.resolve();
+            recordingErrorRef.current = null;
+            nativeRecordingRef.current = false;
+            setIsRecording(false);
+            if (!saved) recordDiagnostic('warning', 'recording', 'REC terminé sans confirmation de sauvegarde');
+          }
+        })();
+      };
+
       recorder.start(1000);
       setIsRecording(true);
-      recordDiagnostic('info', 'recording', 'MediaRecorder démarré', { mimeType: recorder.mimeType, state: recorder.state, audioTrackCount: audioTracks.length });
+      setRecordingMessage(audioTracks.length
+        ? 'REC en cours · PGM vidéo + piste audio active.'
+        : 'REC en cours · vidéo seule, aucune entrée audio connectée.');
+      recordDiagnostic('info', 'recording', 'MediaRecorder démarré', {
+        mimeType: recorder.mimeType, state: recorder.state, audioTrackCount: audioTracks.length,
+        nativeSave: isAndroidNative
+      });
     } catch (error) {
-      videoStream?.getTracks().forEach((track) => track.stop());
+      const message = error instanceof Error ? error.message : 'Impossible de démarrer l’enregistrement.';
+      if (nativeSaveStarted) {
+        try { await DskStreaming.abortVideoRecording(); } catch (abortError) {
+          recordDiagnostic('error', 'recording', 'Échec nettoyage après démarrage REC avorté', abortError);
+        }
+      }
+      nativeRecordingRef.current = false;
+      videoStream?.getVideoTracks().forEach((track) => track.stop());
       recordingVideoStreamRef.current = null;
+      mediaRecorderRef.current = null;
       setIsRecording(false);
-      setRecordingMessage(error instanceof Error ? error.message : 'Impossible de démarrer l’enregistrement.');
+      setRecordingMessage(message);
+      recordDiagnostic('error', 'recording', 'Démarrage REC impossible', { message });
     }
   };
 
