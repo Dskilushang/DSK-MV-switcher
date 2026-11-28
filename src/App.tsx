@@ -316,12 +316,20 @@ export default function App() {
       stream.getVideoTracks().forEach((track) => {
         recordDiagnostic('info', 'camera', 'Piste caméra activée', { label: track.label, readyState: track.readyState, settings: track.getSettings() });
         track.addEventListener('ended', () => {
-          recordDiagnostic('error', 'camera', 'Piste caméra terminée', { label: track.label });
+          recordDiagnostic('error', 'camera', 'Piste caméra terminée', {
+            id: track.id, label: track.label, readyState: track.readyState,
+            visibilityState: document.visibilityState, appHadLive: isLive, appHadRecording: isRecording,
+            remainingVideoTracks: stream.getVideoTracks().map((item) => ({ id: item.id, readyState: item.readyState, muted: item.muted, enabled: item.enabled }))
+          });
           setCameraStatus('error');
           setCameraError('La caméra a interrompu son flux. Appuyez sur Réessayer.');
         });
-        track.addEventListener('mute', () => recordDiagnostic('warning', 'camera', 'Piste caméra mise en pause par le système', { label: track.label }));
-        track.addEventListener('unmute', () => recordDiagnostic('info', 'camera', 'Piste caméra réactivée', { label: track.label }));
+        track.addEventListener('mute', () => recordDiagnostic('warning', 'camera', 'Piste caméra mise en pause par le système', {
+          id: track.id, label: track.label, visibilityState: document.visibilityState, appHadLive: isLive, appHadRecording: isRecording
+        }));
+        track.addEventListener('unmute', () => recordDiagnostic('info', 'camera', 'Piste caméra réactivée', {
+          id: track.id, label: track.label, visibilityState: document.visibilityState
+        }));
       });
       setCameraStatus('active');
     } catch (err) {
@@ -805,6 +813,11 @@ export default function App() {
       videoStream = programCanvasRef.current.captureStream(30);
       recordingVideoStreamRef.current = videoStream;
       const audioTracks = connectedAudioInputs > 0 ? (programAudioStream?.getAudioTracks() || []) : [];
+      recordDiagnostic('info', 'recording', 'Démarrage REC demandé', {
+        connectedAudioInputs,
+        programAudioTracks: audioTracks.map((track) => ({ label: track.label, enabled: track.enabled, muted: track.muted, readyState: track.readyState })),
+        videoTracks: videoStream.getVideoTracks().map((track) => ({ readyState: track.readyState, settings: track.getSettings() }))
+      });
       const recordingStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...audioTracks
@@ -826,11 +839,17 @@ export default function App() {
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) recordedChunks.current.push(event.data);
       };
-      recorder.onerror = () => {
+      recorder.onerror = (event) => {
+        recordDiagnostic('error', 'recording', 'Erreur MediaRecorder pendant la capture', {
+          error: event instanceof Event ? event.type : String(event), state: recorder.state, mimeType: recorder.mimeType
+        });
         setRecordingMessage('Erreur MediaRecorder pendant la capture.');
       };
       recorder.onstop = () => {
         const blob = new Blob(recordedChunks.current, { type: recorder.mimeType || 'video/webm' });
+        recordDiagnostic(blob.size > 0 ? 'info' : 'error', 'recording', 'Enregistrement REC terminé', {
+          blobSize: blob.size, chunkCount: recordedChunks.current.length, mimeType: recorder.mimeType, finalState: recorder.state
+        });
         if (blob.size > 0) {
           const url = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
@@ -849,6 +868,7 @@ export default function App() {
       };
       recorder.start(1000);
       setIsRecording(true);
+      recordDiagnostic('info', 'recording', 'MediaRecorder démarré', { mimeType: recorder.mimeType, state: recorder.state, audioTrackCount: audioTracks.length });
     } catch (error) {
       videoStream?.getTracks().forEach((track) => track.stop());
       recordingVideoStreamRef.current = null;
@@ -883,18 +903,22 @@ export default function App() {
     try {
       const streamActive = await getObsStreamActive();
       if (streamActive) {
+        recordDiagnostic('info', 'live', 'Arrêt du LIVE demandé');
         await stopObsStream();
         setIsLive(false);
         if (isAndroid) {
           await DskStreaming.stopBackgroundService();
+          recordDiagnostic('info', 'live', 'Service Android LIVE arrêté');
         }
         setLiveMessage('Diffusion OBS arrêtée.');
       } else {
         if (isAndroid) {
+          recordDiagnostic('info', 'live', 'Démarrage du service Android LIVE demandé');
           await DskStreaming.startBackgroundService({
             title: 'DSK-MV — LIVE actif',
             text: 'Maintien de la session OBS en arrière-plan'
           });
+          recordDiagnostic('info', 'live', 'Service Android LIVE démarré');
         }
 
         try {
@@ -902,6 +926,7 @@ export default function App() {
           const confirmed = await getObsStreamActive();
           setIsLive(confirmed);
           if (confirmed) {
+            recordDiagnostic('info', 'live', 'Diffusion OBS confirmée active');
             setLiveMessage('Diffusion OBS active.');
           } else {
             if (isAndroid) await DskStreaming.stopBackgroundService();
@@ -920,6 +945,7 @@ export default function App() {
         }
       }
     } catch (error) {
+      recordDiagnostic('error', 'live', 'Échec de la commande LIVE OBS', error);
       setLiveMessage(error instanceof Error ? error.message : 'Commande LIVE OBS impossible.');
     } finally {
       setIsLiveBusy(false);
