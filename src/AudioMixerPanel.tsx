@@ -298,6 +298,7 @@ export default function AudioMixerPanel({ open, onClose, onProgramStreamChange, 
       onProgramStreamChange?.(engine.getProgramStream());
       setChannels(engine.getAllChannelSnapshots());
       setEngineReady(true);
+      setMonitorEnabled(false);
       recordDiagnostic('info', 'audio', 'Moteur audio activé dans le mixeur', { state: engine.state, sampleRate: engine.sampleRate, channels: engine.channelCount });
       await refreshInputDevices();
     } catch (cause) {
