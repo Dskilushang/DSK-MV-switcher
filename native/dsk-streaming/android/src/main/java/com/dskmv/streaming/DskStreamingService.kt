@@ -124,6 +124,21 @@ class DskStreamingService : Service() {
         wifiLock = null
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        DskNativeDiagnostics.append(this, "WARNING", "Tâche Android retirée des applications récentes")
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onLowMemory() {
+        DskNativeDiagnostics.append(this, "WARNING", "Android signale une mémoire système faible")
+        super.onLowMemory()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        DskNativeDiagnostics.append(this, "WARNING", "Android demande de libérer de la mémoire", null)
+        super.onTrimMemory(level)
+    }
+
     override fun onDestroy() {
         DskNativeDiagnostics.append(this, "WARNING", "Service LIVE Android détruit")
         isRunning = false
