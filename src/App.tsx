@@ -226,6 +226,8 @@ export default function App() {
   const programMonitorRef = useRef<HTMLVideoElement>(null);
   const previewMonitorRef = useRef<HTMLVideoElement>(null);
   const [isProgramViewOpen, setIsProgramViewOpen] = useState(false);
+  const isProgramViewOpenRef = useRef(isProgramViewOpen);
+  isProgramViewOpenRef.current = isProgramViewOpen;
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingVideoStreamRef = useRef<MediaStream | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
@@ -234,6 +236,65 @@ export default function App() {
   const recordingErrorRef = useRef<string | null>(null);
   const chromaCanvasRef = useRef<HTMLCanvasElement>(null);
   const chromaAnimationRef = useRef<number | null>(null);
+
+  // Point d'entrée unique pour créer, valider et rattacher le flux vidéo PGM partagé.
+  const syncPgmCaptureStream = useCallback((forceRecreate = false): MediaStream | null => {
+    const canvas = programCanvasRef.current;
+    if (!canvas) return null;
+
+    const current = pgmCaptureStreamRef.current;
+    const hasLiveVideo = current?.getVideoTracks().some((track) => track.readyState === 'live') ?? false;
+    const createdNew = forceRecreate || !current || !hasLiveVideo;
+    let stream = current;
+
+    if (createdNew) {
+      stream = canvas.captureStream(30);
+      pgmCaptureStreamRef.current = stream;
+      recordDiagnostic('info', 'video', 'Flux PGM partagé (re)créé à 30 FPS', {
+        videoTracks: stream.getVideoTracks().map((track) => ({
+          id: track.id,
+          readyState: track.readyState,
+          muted: track.muted
+        }))
+      });
+
+      stream.getVideoTracks().forEach((track) => {
+        track.addEventListener('ended', () => {
+          // Un ancien flux ne doit jamais déclencher une seconde recréation.
+          if (pgmCaptureStreamRef.current !== stream) return;
+          recordDiagnostic('warning', 'video', 'Piste vidéo PGM terminée : récupération du flux partagé', {
+            trackId: track.id,
+            visibilityState: document.visibilityState
+          });
+          syncPgmCaptureStream(true);
+        }, { once: true });
+      });
+    }
+
+    if (!stream) return null;
+
+    const monitorVideo = programMonitorRef.current;
+    if (monitorVideo && (createdNew || monitorVideo.srcObject !== stream)) {
+      monitorVideo.srcObject = stream;
+      void monitorVideo.play().catch((error) => {
+        recordDiagnostic('warning', 'video', 'Lecture du moniteur PGM impossible après synchronisation', {
+          message: error instanceof Error ? error.message : String(error)
+        });
+      });
+    }
+
+    const directVideo = programPreviewVideoRef.current;
+    if (isProgramViewOpenRef.current && directVideo && (createdNew || directVideo.srcObject !== stream)) {
+      directVideo.srcObject = stream;
+      void directVideo.play().catch((error) => {
+        recordDiagnostic('warning', 'video', 'Lecture de DIRECT impossible après synchronisation', {
+          message: error instanceof Error ? error.message : String(error)
+        });
+      });
+    }
+
+    return stream;
+  }, []);
 
   // --- CONNEXION OBS ---
   useEffect(() => {
@@ -661,34 +722,30 @@ export default function App() {
     };
   }, [programChannel, previewChannel, remoteCameraStreams, mediaUrl, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
 
-  // --- FLUX PGM PARTAGÉ : UNE SEULE CAPTURE DU CANVAS À 30 FPS ---
+  // --- FLUX PGM PARTAGÉ : UNE CAPTURE À 30 FPS, AVEC RÉCUPÉRATION ---
   useEffect(() => {
-    const canvas = programCanvasRef.current;
-    const video = programMonitorRef.current;
-    if (!canvas || !video) return;
-
-    // Cette capture appartient à App : les consommateurs ne doivent jamais arrêter ses pistes.
-    const stream = canvas.captureStream(30);
-    pgmCaptureStreamRef.current = stream;
-    video.srcObject = stream;
-    void video.play().catch((error) => {
-      recordDiagnostic('warning', 'video', 'Lecture du moniteur PGM impossible', {
-        message: error instanceof Error ? error.message : String(error)
-      });
-    });
-    recordDiagnostic('info', 'video', 'Flux PGM partagé créé', {
-      frameRate: stream.getVideoTracks()[0]?.getSettings().frameRate ?? 30,
-      trackCount: stream.getVideoTracks().length
-    });
+    if (!syncPgmCaptureStream()) return;
 
     return () => {
-      video.pause();
-      video.srcObject = null;
-      if (pgmCaptureStreamRef.current === stream) pgmCaptureStreamRef.current = null;
-      // Seul le propriétaire du flux partagé arrête ses pistes, au démontage de l'application.
-      stream.getTracks().forEach((track) => track.stop());
+      // App est propriétaire du flux : seul son démontage peut arrêter les pistes partagées.
+      const ownedStream = pgmCaptureStreamRef.current;
+      pgmCaptureStreamRef.current = null;
+
+      const monitorVideo = programMonitorRef.current;
+      if (monitorVideo?.srcObject === ownedStream) {
+        monitorVideo.pause();
+        monitorVideo.srcObject = null;
+      }
+
+      const directVideo = programPreviewVideoRef.current;
+      if (directVideo?.srcObject === ownedStream) {
+        directVideo.pause();
+        directVideo.srcObject = null;
+      }
+
+      ownedStream?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [syncPgmCaptureStream]);
 
   useEffect(() => {
     const video = previewMonitorRef.current;
@@ -709,25 +766,18 @@ export default function App() {
     if (!isProgramViewOpen) return;
 
     const video = programPreviewVideoRef.current;
-    const stream = pgmCaptureStreamRef.current;
-    if (!video || !stream || stream.getVideoTracks().every((track) => track.readyState !== 'live')) {
-      recordDiagnostic('warning', 'video', 'Vue DIRECT indisponible : flux PGM partagé absent ou arrêté');
+    const stream = syncPgmCaptureStream();
+    if (!video || !stream) {
+      recordDiagnostic('warning', 'video', 'Vue DIRECT indisponible : impossible de récupérer le flux PGM partagé');
       return;
     }
-
-    video.srcObject = stream;
-    void video.play().catch((error) => {
-      recordDiagnostic('warning', 'video', 'Lecture de la vue DIRECT impossible', {
-        message: error instanceof Error ? error.message : String(error)
-      });
-    });
 
     return () => {
       video.pause();
       video.srcObject = null;
-      // Ne pas arrêter les pistes : le moniteur PGM et REC utilisent le même flux.
+      // DIRECT détache son lecteur, mais ne possède et n'arrête jamais les pistes partagées.
     };
-  }, [isProgramViewOpen]);
+  }, [isProgramViewOpen, syncPgmCaptureStream]);
 
   // --- TRANSITIONS ---
   // CUT / fin de T-Bar : bascule immédiate PGM ↔ PVW.
@@ -862,8 +912,8 @@ export default function App() {
 
     let nativeSaveStarted = false;
     try {
-      const sharedPgmStream = pgmCaptureStreamRef.current;
-      if (!sharedPgmStream) throw new Error('Flux PGM partagé indisponible. Fermez puis rouvrez la régie.');
+      const sharedPgmStream = syncPgmCaptureStream();
+      if (!sharedPgmStream) throw new Error('Flux PGM partagé indisponible : capture du canvas impossible.');
       const videoTracks = sharedPgmStream.getVideoTracks().filter((track) => track.readyState === 'live');
       if (videoTracks.length === 0) throw new Error('Aucune piste vidéo PGM active.');
 
