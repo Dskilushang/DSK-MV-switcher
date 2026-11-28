@@ -110,6 +110,8 @@ export default function SystemPanel(props: SystemPanelProps) {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [orientation, setOrientation] = useState('Non détectée');
   const [diagnosticEntries, setDiagnosticEntries] = useState<DiagnosticEntry[]>(() => getDiagnosticEntries());
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false);
+  const [diagnosticsExportMessage, setDiagnosticsExportMessage] = useState('');
   const lastNativeLogRef = useRef('');
 
   useEffect(() => subscribeDiagnostics(() => setDiagnosticEntries(getDiagnosticEntries())), []);
@@ -127,14 +129,45 @@ export default function SystemPanel(props: SystemPanelProps) {
     return () => { cancelled = true; };
   }, [open]);
 
-  const downloadDiagnostics = () => {
-    const blob = new Blob([exportDiagnostics()], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `DSK-MV-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  const downloadDiagnostics = async () => {
+    if (isExportingDiagnostics) return;
+    setIsExportingDiagnostics(true);
+    setDiagnosticsExportMessage('');
+    const filename = 'DSK-MV-diagnostics-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+    try {
+      let report: Record<string, unknown> = JSON.parse(exportDiagnostics()) as Record<string, unknown>;
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+        try {
+          const nativeLog = await DskStreaming.getNativeCrashLog();
+          report = { ...report, nativeAndroidLog: nativeLog.content || '', nativeAndroidLogIncluded: true };
+        } catch (error) {
+          report = { ...report, nativeAndroidLog: null, nativeAndroidLogIncluded: false, nativeAndroidLogReadError: error instanceof Error ? error.message : String(error) };
+        }
+        const result = await DskStreaming.saveDiagnosticsReport({ filename, content: JSON.stringify(report, null, 2) });
+        if (!result.saved || !result.uri) throw new Error('Android n’a pas confirmé l’enregistrement du fichier.');
+        setDiagnosticsExportMessage('Rapport enregistré : Téléchargements/DSK-MV/' + result.filename);
+        recordDiagnostic('info', 'diagnostics-export', 'Rapport JSON enregistré dans Téléchargements/DSK-MV', { uri: result.uri, filename: result.filename });
+      } else {
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        setDiagnosticsExportMessage('Téléchargement du rapport demandé au navigateur.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDiagnosticsExportMessage('Échec de l’export : ' + message);
+      recordDiagnostic('error', 'diagnostics-export', 'Échec de l’export du rapport JSON', { message });
+    } finally {
+      setIsExportingDiagnostics(false);
+      setDiagnosticEntries(getDiagnosticEntries());
+    }
   };
 
   useEffect(() => {
@@ -328,7 +361,7 @@ export default function SystemPanel(props: SystemPanelProps) {
                   <p className="mt-1 text-[9px] text-slate-400">{diagnosticEntries.length} événement(s) conservé(s) localement · erreurs et cycle de vie inclus</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={downloadDiagnostics} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white">EXPORTER JSON</button>
+                  <button onClick={() => void downloadDiagnostics()} disabled={isExportingDiagnostics} className="rounded bg-sky-700 px-3 py-2 text-[9px] font-black text-white disabled:cursor-wait disabled:opacity-50">{isExportingDiagnostics ? "EXPORT…" : "EXPORTER JSON"}</button>
                   <button onClick={() => {
                     clearDiagnostics();
                     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
@@ -339,6 +372,7 @@ export default function SystemPanel(props: SystemPanelProps) {
                 </div>
               </div>
               <p className="text-[9px] text-slate-500">Le journal conserve les erreurs JavaScript, promesses rejetées, événements caméra/audio, changements réseau et passages arrière-plan/premier plan. Les exceptions Java/Kotlin non interceptées sont aussi conservées côté Android et récupérées à la prochaine ouverture. Les arrêts forcés par le système (OOM killer) et les crashs natifs bas niveau peuvent rester invisibles à l’application.</p>
+              {diagnosticsExportMessage && <p role="status" className={`rounded border px-3 py-2 text-[10px] ${diagnosticsExportMessage.startsWith("Échec") ? "border-red-800 bg-red-950/40 text-red-300" : "border-emerald-800 bg-emerald-950/30 text-emerald-300"}`}>{diagnosticsExportMessage}</p>}
               <div className="max-h-[48dvh] space-y-1 overflow-y-auto rounded-lg border border-slate-800 bg-black/40 p-2">
                 {diagnosticEntries.slice().reverse().slice(0, 100).map((entry) => (
                   <details key={entry.id} className="rounded border border-slate-800 bg-slate-900/80 px-2 py-1">
