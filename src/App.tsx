@@ -315,7 +315,11 @@ export default function App() {
       setCameraStream(stream);
       stream.getVideoTracks().forEach((track) => {
         recordDiagnostic('info', 'camera', 'Piste caméra activée', { label: track.label, readyState: track.readyState, settings: track.getSettings() });
-        track.addEventListener('ended', () => recordDiagnostic('error', 'camera', 'Piste caméra terminée', { label: track.label }));
+        track.addEventListener('ended', () => {
+          recordDiagnostic('error', 'camera', 'Piste caméra terminée', { label: track.label });
+          setCameraStatus('error');
+          setCameraError('La caméra a interrompu son flux. Appuyez sur Réessayer.');
+        });
         track.addEventListener('mute', () => recordDiagnostic('warning', 'camera', 'Piste caméra mise en pause par le système', { label: track.label }));
         track.addEventListener('unmute', () => recordDiagnostic('info', 'camera', 'Piste caméra réactivée', { label: track.label }));
       });
@@ -1058,9 +1062,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Matrice 1 à 8 (FLEX pour tout faire tenir) */}
+        {/* Matrice 1 à 4 · mode expérimental */}
         <div className="flex flex-row flex-1 justify-between gap-1 min-w-0">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((ch) => {
+          {[1, 2, 3, 4].map((ch) => {
             const isP = programChannel === ch;
             const isV = previewChannel === ch;
             return (
