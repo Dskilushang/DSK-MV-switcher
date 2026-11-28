@@ -54,13 +54,20 @@ export class CameraLanReceiver {
     for (const cameraId of uniqueCameraIds) this.openSession(cleanHost, port, token.trim(), cameraId);
   }
 
-  connectCamera(cameraId: number): void {
+  connectCamera(cameraId: number, host?: string, port?: number, token?: string): void {
+    if (host !== undefined && port !== undefined && token !== undefined) {
+      const cleanHost = host.trim().replace(/^https?:\\/\\//i, '').replace(/\\/+$/, '');
+      if (!cleanHost || /[/?#]/.test(cleanHost)) throw new Error('Adresse du Receiver vidéo invalide.');
+      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port vidéo invalide.');
+      if (token.trim().length < 16) throw new Error('Code d’association trop court.');
+      this.connectionConfig = { host: cleanHost, port, token: token.trim() };
+    }
     if (!this.connectionConfig) throw new Error('Configurez d’abord le Receiver vidéo.');
     if (!CAMERA_IDS.includes(cameraId as typeof CAMERA_IDS[number])) throw new Error('Identifiant de caméra distante invalide.');
     this.disconnectCamera(cameraId);
     this.stopped = false;
-    const { host, port, token } = this.connectionConfig;
-    this.openSession(host, port, token, cameraId);
+    const config = this.connectionConfig;
+    this.openSession(config.host, config.port, config.token, cameraId);
   }
 
   reconnectCamera(cameraId: number): void {
