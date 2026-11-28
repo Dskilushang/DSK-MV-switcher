@@ -510,7 +510,7 @@ export default function App() {
   // --- MOTEUR DU CANVAS (GÈRE LE FREEZE, LE FONDU ET LE LOGO) ---
   useEffect(() => {
     let frameId: number | null = null;
-    let timerId: number | null = null;
+    let lastDrawAt = -Infinity;
     const canvas = programCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -522,7 +522,13 @@ export default function App() {
     // Cadence fixe : évite d'exécuter une callback RAF à chaque rafraîchissement
     // écran (60/90/120 Hz) alors que le PGM ne doit être recomposé qu'à 30 FPS.
     const targetFrameInterval = 1000 / 30;
-    const draw = () => {
+    const draw = (timestamp: number) => {
+        // RAF peut tourner à 60/90/120 Hz : ne recomposer le PGM qu'une fois par intervalle de 33,3 ms.
+        if (timestamp - lastDrawAt < targetFrameInterval) {
+          frameId = requestAnimationFrame(draw);
+          return;
+        }
+        lastDrawAt = timestamp;
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
@@ -647,13 +653,10 @@ export default function App() {
           ctx.restore();
         });
 
-      timerId = window.setTimeout(() => {
-        frameId = requestAnimationFrame(draw);
-      }, targetFrameInterval);
+      frameId = requestAnimationFrame(draw);
     };
     frameId = requestAnimationFrame(draw);
     return () => {
-      if (timerId !== null) window.clearTimeout(timerId);
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
   }, [programChannel, previewChannel, remoteCameraStreams, mediaUrl, programZoom, isLogoActive, customLogo, logoPos, isFrozen, isChromaActive, isPipActive, pipSourceChannel, pipScale, pipPosition, dskLayers]);
