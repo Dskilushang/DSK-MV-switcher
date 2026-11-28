@@ -56,7 +56,7 @@ export class CameraLanReceiver {
 
   connectCamera(cameraId: number, host?: string, port?: number, token?: string): void {
     if (host !== undefined && port !== undefined && token !== undefined) {
-      const cleanHost = host.trim().replace(/^https?:\\/\\//i, '').replace(/\\/+$/, '');
+    const cleanHost = host.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
       if (!cleanHost || /[/?#]/.test(cleanHost)) throw new Error('Adresse du Receiver vidéo invalide.');
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port vidéo invalide.');
       if (token.trim().length < 16) throw new Error('Code d’association trop court.');
